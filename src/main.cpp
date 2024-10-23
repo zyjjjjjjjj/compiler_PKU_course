@@ -33,7 +33,16 @@ int main(int argc, const char *argv[]) {
   assert(!ret);
 
   // 输出解析得到的 AST
-  ast->Dump();
-  cout<<endl;
+  //ast->Dump();
+  //cout<<endl;
+
+  // 将 AST 转换为 IR
+  auto ir = ast->toKoopaIR();
+
+  //输出到文件
+  freopen(output, "w", stdout);
+  ir->Dump();
+  fclose(stdout);
+
   return 0;
 }
