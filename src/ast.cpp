@@ -1,5 +1,5 @@
 // AST.cpp
-#include "AST.h"
+#include "ast.h"
 
 // CompUnitAST 类的实现
 void CompUnitAST::Dump() const {
