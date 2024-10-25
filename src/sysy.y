@@ -84,7 +84,7 @@ FuncDef
 FuncType
   : INT {
     auto ast = new FuncTypeAST();
-    ast->Int = *new string("int");
+    ast->func_type = *new string("int");
     $$ = ast;
   }
   ;

@@ -37,12 +37,18 @@ int main(int argc, const char *argv[]) {
   //cout<<endl;
 
   // 将 AST 转换为 IR
-  auto ir = ast->toKoopaIR();
+  koopa_raw_program_t *raw_program = (koopa_raw_program_t *)ast->toKoopaIR();
+  koopa_program_t program;
+  koopa_error_code_t eno = koopa_generate_raw_to_koopa(raw_program, &program);
+  if (eno != KOOPA_EC_SUCCESS) {
+    std::cout << "generate raw to koopa error: " << (int)eno << std::endl;
+    return 0;
+  }
 
   //输出到文件
-  freopen(output, "w", stdout);
-  ir->Dump();
-  fclose(stdout);
+  koopa_dump_to_file(program, output);
+  printf("output to %s\n", output);
+  //koopa_delete_program(program);
 
   return 0;
 }
