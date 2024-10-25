@@ -34,3 +34,16 @@ char *add_prefix(const char *prefix, const char *name) {
     strcat(new_name, name);
     return new_name;
 }
+
+char *remove_prefix(const char *prefix, const char *name) {
+    if(strncmp(prefix, name, strlen(prefix)) == 0) {
+        return strdup(name + strlen(prefix));
+    }
+    return strdup(name);
+}
+
+void koopa_dump_riscv_to_file(koopa_raw_program_t &raw_program, const char *path) {
+    FILE* original_stdout = stdout;
+    freopen(path, "w", stdout);
+    stdout = original_stdout;
+}
