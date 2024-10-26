@@ -40,24 +40,36 @@ int main(int argc, const char *argv[]) {
 
   // 将 AST 转换为 IR
   koopa_raw_program_t *raw_program = (koopa_raw_program_t *)ast->toKoopaIR();
+  std::cout<<"to koopa ir finish\n";
+
+  koopa_program_t inter_program, program;
+  koopa_error_code_t eno = koopa_generate_raw_to_koopa(raw_program, &inter_program);
+  if (eno != KOOPA_EC_SUCCESS) {
+    std::cout << "generate raw to koopa error: " << (int)eno << std::endl;
+    return 0;
+  }
+  std::cout<<"generate koopa program finish\n";
 
   //输出到文件
   if(std::string(mode) == "-koopa") {
-    koopa_program_t program;
-    koopa_error_code_t eno = koopa_generate_raw_to_koopa(raw_program, &program);
-    if (eno != KOOPA_EC_SUCCESS) {
-      std::cout << "generate raw to koopa error: " << (int)eno << std::endl;
-      return 0;
-    }
-    koopa_dump_to_file(program, output);
-    koopa_delete_program(program);
+    koopa_dump_to_file(inter_program, output);
+    koopa_delete_program(inter_program);
   }
   else if(std::string(mode) == "-riscv") {
+    size_t len = 1000000u;
+    char *buf = new char[len];
+    koopa_dump_to_string(inter_program, buf, &len);
+    koopa_delete_program(inter_program);
+    koopa_parse_from_string(buf, &program);
+    koopa_raw_program_builder_t raw_builder= koopa_new_raw_program_builder();
+    koopa_raw_program_t Raw_Program = koopa_build_raw_program(raw_builder, program);
+    koopa_delete_program(program);
     std::ofstream file(output);
     if (file.is_open()) {
-      Visit(*raw_program, file);
+      Visit(Raw_Program, file);
       file.close();
     }
+
   }
   std::cout<<"stored in "<<output<<"\n";
 
