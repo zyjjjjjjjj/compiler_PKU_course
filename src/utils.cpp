@@ -1,5 +1,29 @@
 #include "utils.h"
 
+void SymbolList::addSymbol(std::string symbol, int value) {
+    if(symbol_list_array.empty()) {
+        symbol_list_array.push_back(std::map<std::string, int>());
+    }
+    symbol_list_array.back()[symbol] = value;
+}
+
+int SymbolList::getSymbol(std::string symbol) {
+    for(auto it = symbol_list_array.rbegin(); it != symbol_list_array.rend(); it++) {
+        if(it->find(symbol) != it->end()) {
+            return it->at(symbol);
+        }
+    }
+    return -2;
+}
+
+void SymbolList::Dump() const {
+    for(auto &symbol_map : symbol_list_array) {
+        for(auto &symbol : symbol_map) {
+            std::cout << symbol.first << " : " << symbol.second << std::endl;
+        }
+    }
+}
+
 koopa_raw_slice_t make_slice(std::vector<const void *> *buf, koopa_raw_slice_item_kind_t kind) {
     koopa_raw_slice_t slice;
     slice.kind = kind;

@@ -35,8 +35,8 @@ int main(int argc, const char *argv[]) {
   assert(!ret);
 
   // 输出解析得到的 AST
-  //ast->Dump();
-  //cout<<endl;
+  ast->Dump();
+  cout<<endl;
 
   // 将 AST 转换为 IR
   koopa_raw_program_t *raw_program = (koopa_raw_program_t *)ast->toKoopaIR();

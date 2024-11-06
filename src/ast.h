@@ -7,6 +7,8 @@
 #include "koopa.h"
 #include "utils.h"
 
+static SymbolList symbol_list;
+
 // 基类声明
 class BaseAST {
  public:
@@ -15,6 +17,7 @@ class BaseAST {
   virtual void Dump() const = 0;
   virtual void *toKoopaIR() const { return nullptr; };
   virtual void *toKoopaIR(std::vector<const void *> &stmts) const { return nullptr; };
+  virtual int calculate() const { return 0; };
 };
 
 // CompUnitAST 派生类
@@ -49,10 +52,65 @@ class FuncTypeAST : public BaseAST {
 // BlockAST 派生类
 class BlockAST : public BaseAST {
  public:
-  std::unique_ptr<BaseAST> stmt;
+  std::unique_ptr<std::vector<std::unique_ptr<BaseAST>>> block_item_array;
 
   void Dump() const override;
   void *toKoopaIR() const override;
+};
+
+class BlockItemAST : public BaseAST {
+ public:
+  std::unique_ptr<BaseAST> decl;
+  std::unique_ptr<BaseAST> stmt;
+  std::string block_item_type;
+
+  void Dump() const override;
+  void *toKoopaIR(std::vector<const void *> &stmts) const override;
+};
+
+
+class DeclAST : public BaseAST {
+ public:
+  std::unique_ptr<BaseAST> const_decl;
+
+  void Dump() const override;
+  void *toKoopaIR(std::vector<const void *> &stmts) const override;
+};
+
+class ConstDeclAST : public BaseAST {
+ public:
+  std::unique_ptr<BaseAST> type;
+  std::unique_ptr<std::vector<std::unique_ptr<BaseAST>>> const_def_array;
+
+  void Dump() const override;
+  void *toKoopaIR(std::vector<const void *> &stmts) const override;
+};
+
+class BTypeAST : public BaseAST {
+ public:
+  std::string type;
+
+  void Dump() const override;
+  void *toKoopaIR() const override;
+};
+
+class ConstDefAST : public BaseAST {
+ public:
+  std::string ident;
+  std::unique_ptr<BaseAST> const_init_val;
+
+  void Dump() const override;
+  void *toKoopaIR(std::vector<const void *> &stmts) const override;
+};
+
+class ConstInitValAST : public BaseAST {
+ public:
+  std::unique_ptr<BaseAST> const_exp;
+
+  void Dump() const override;
+  void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  int calculate() const override;
+
 };
 
 // StmtAST 派生类
@@ -65,12 +123,22 @@ class StmtAST : public BaseAST {
   void *toKoopaIR(std::vector<const void *> &stmts) const override;
 };
 
+class ConstExpAST : public BaseAST {
+ public:
+  std::unique_ptr<BaseAST> exp;
+
+  void Dump() const override;
+  void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  int calculate() const override;
+};
+
 class ExpAST : public BaseAST {
  public:
   std::unique_ptr<BaseAST> lor_exp;
 
   void Dump() const override;
   void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  int calculate() const override;
 };
 
 class LOrExpAST : public BaseAST {
@@ -82,6 +150,7 @@ class LOrExpAST : public BaseAST {
   void Dump() const override;
   void *toKoopaIR(std::vector<const void *> &stmts) const override;
   void *toBoolKoopaIR(const std::unique_ptr<BaseAST> &exp, std::vector<const void *> &stmts) const;
+  int calculate() const override;
 };
 
 class LAndExpAST : public BaseAST {
@@ -93,6 +162,7 @@ class LAndExpAST : public BaseAST {
   void Dump() const override;
   void *toKoopaIR(std::vector<const void *> &stmts) const override;
   void *toBoolKoopaIR(const std::unique_ptr<BaseAST> &exp, std::vector<const void *> &stmts) const;
+  int calculate() const override;
 };
 
 class EqExpAST : public BaseAST {
@@ -103,6 +173,7 @@ class EqExpAST : public BaseAST {
 
   void Dump() const override;
   void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  int calculate() const override;
 };
 
 class RelExpAST : public BaseAST {
@@ -113,6 +184,7 @@ class RelExpAST : public BaseAST {
 
   void Dump() const override;
   void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  int calculate() const override;
 };
 
 class AddExpAST : public BaseAST {
@@ -123,6 +195,7 @@ class AddExpAST : public BaseAST {
 
   void Dump() const override;
   void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  int calculate() const override;
 };
 
 class MulExpAST : public BaseAST {
@@ -133,6 +206,7 @@ class MulExpAST : public BaseAST {
 
   void Dump() const override;
   void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  int calculate() const override;
 };
 
 class UnaryExpAST : public BaseAST {
@@ -144,6 +218,7 @@ class UnaryExpAST : public BaseAST {
 
   void Dump() const override;
   void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  int calculate() const override;
 };
 
 class PrimaryExpAST : public BaseAST {
@@ -151,9 +226,11 @@ class PrimaryExpAST : public BaseAST {
   std::string tag;
   std::unique_ptr<BaseAST> exp;
   std::unique_ptr<BaseAST> number;
+  std::unique_ptr<BaseAST> lval;
 
   void Dump() const override;
   void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  int calculate() const override;
 };
 
 // NumberAST 派生类
@@ -165,4 +242,15 @@ class NumberAST : public BaseAST {
   NumberAST(int num);
   void Dump() const override;
   void *toKoopaIR() const override;
+  int calculate() const override;
+};
+
+// LValAST 派生类
+class LValAST : public BaseAST {
+ public:
+  std::string ident;
+
+  void Dump() const override;
+  void *toKoopaIR() const override;
+  int calculate() const override;
 };

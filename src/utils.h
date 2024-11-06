@@ -1,10 +1,21 @@
 #pragma once
 #include "koopa.h"
 #include "visit.h"
+#include <map>
 #include <vector>
 #include <cstring>
 #include <stdio.h>
 
+class SymbolList {
+private:
+  std::vector<std::map<std::string, int>> symbol_list_array;
+
+public:
+  ~SymbolList() = default;
+  void addSymbol(std::string symbol, int value);
+  int getSymbol(std::string symbol);
+  void Dump() const;
+};
 
 koopa_raw_slice_t make_slice(std::vector<const void *> *buf, koopa_raw_slice_item_kind_t kind);
 
