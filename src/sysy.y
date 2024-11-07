@@ -44,8 +44,8 @@ using namespace std;
 
 // 非终结符的类型定义
 %type <ast_val> FuncDef FuncType Block Stmt Exp LOrExp LAndExp EqExp RelExp AddExp MulExp UnaryExp PrimaryExp Number
-%type <ast_val> BlockItem Decl ConstDecl ConstDef ConstInitVal ConstExp LVal BType
-%type <ast_vec> ConstDefArray BlockItemArray
+%type <ast_val> BlockItem Decl ConstDecl VarDecl ConstDef VarDef ConstInitVal InitVal ConstExp LVal BType
+%type <ast_vec> ConstDefArray BlockItemArray VarDefArray
 %type <str_val> UnaryOp
 
 %%
@@ -137,6 +137,22 @@ Decl
   : ConstDecl {
     auto ast = new DeclAST();
     ast->const_decl = unique_ptr<BaseAST>($1);
+    ast->decl_type = *new string("CONST");
+    $$ = ast;
+  }
+  | VarDecl {
+    auto ast = new DeclAST();
+    ast->var_decl = unique_ptr<BaseAST>($1);
+    ast->decl_type = *new string("VAR");
+    $$ = ast;
+  }
+  ;
+
+VarDecl
+  : BType VarDefArray ';' {
+    auto ast = new VarDeclAST();
+    ast->type = std::unique_ptr<BaseAST>($1);
+    ast->var_def_array = std::unique_ptr<std::vector<std::unique_ptr<BaseAST>>>($2);
     $$ = ast;
   }
   ;
@@ -171,11 +187,41 @@ ConstDefArray
   }
   ;
 
+VarDefArray
+  : VarDef {
+    auto vec = new std::vector<std::unique_ptr<BaseAST>> ();
+    auto var_def = std::unique_ptr<BaseAST>($1);
+    vec->push_back(std::move(var_def));
+    $$ = vec;
+  }
+  | VarDef ',' VarDefArray {
+    auto vec =(std::vector<std::unique_ptr<BaseAST>>*)($3);
+    auto var_def = std::unique_ptr<BaseAST>($1);
+    vec->push_back(std::move(var_def));
+    $$ = vec;
+  }
+  ;
+
 ConstDef
   : IDENT '=' ConstInitVal {
     auto ast = new ConstDefAST();
     ast->ident = *unique_ptr<string>($1);
     ast->const_init_val = unique_ptr<BaseAST>($3);
+    $$ = ast;
+  }
+  ;
+
+VarDef
+  : IDENT {
+    auto ast = new VarDefAST();
+    ast->ident = *unique_ptr<string>($1);
+    ast->var_init_val = nullptr;
+    $$ = ast;
+  }
+  | IDENT '=' InitVal {
+    auto ast = new VarDefAST();
+    ast->ident = *unique_ptr<string>($1);
+    ast->var_init_val = unique_ptr<BaseAST>($3);
     $$ = ast;
   }
   ;
@@ -187,14 +233,27 @@ ConstInitVal
     $$ = ast;
   }
 
+InitVal
+  : Exp {
+    auto ast = new InitValAST();
+    ast->exp = unique_ptr<BaseAST>($1);
+    $$ = ast;
+  }
+
 Stmt
   : RETURN Exp ';' {
     auto ast = new StmtAST();
-    ast->Return = *new string("return");
+    ast->stmt_type = *new string("RETURN");
     ast->exp = unique_ptr<BaseAST>($2);
     $$ = ast;
   }
-  ;
+  | LVal '=' Exp ';' {
+    auto ast = new StmtAST();
+    ast->lval = unique_ptr<BaseAST>($1);
+    ast->exp = unique_ptr<BaseAST>($3);
+    ast->stmt_type = *new string("ASSIGN");
+    $$ = ast;
+  }
 
 ConstExp
   : Exp {

@@ -96,12 +96,24 @@ void *BlockItemAST::toKoopaIR(std::vector<const void *> &stmts) const {
 
 void DeclAST::Dump() const {
     std::cout << "DeclAST { ";
-    const_decl->Dump();
+    if(decl_type == "CONST") {
+        const_decl->Dump();
+    }
+    else if(decl_type == "VAR") {
+        var_decl->Dump();
+    }
     std::cout << " }";
 }
 
 void *DeclAST::toKoopaIR(std::vector<const void *> &stmts) const {
-    return const_decl->toKoopaIR(stmts);
+    std::cout<<"enter decl to koopa ir\n";
+    if(decl_type == "CONST") {
+        return const_decl->toKoopaIR(stmts);
+    }
+    else if(decl_type == "VAR") {
+        return var_decl->toKoopaIR(stmts);
+    }
+    return nullptr;
 }
 
 void ConstDeclAST::Dump() const {
@@ -120,12 +132,29 @@ void *ConstDeclAST::toKoopaIR(std::vector<const void *> &stmts) const {
     return nullptr;
 }
 
+void VarDeclAST::Dump() const {
+    std::cout << "VarDeclAST { ";
+    type->Dump();
+    for(auto &var_def : *var_def_array) {
+        var_def->Dump();
+    }
+    std::cout << " }";
+}
+
+void *VarDeclAST::toKoopaIR(std::vector<const void *> &stmts) const {
+    koopa_raw_type_t var_type = (const koopa_raw_type_t)type->toKoopaIR();
+    for(auto &var_def : *var_def_array) {
+        var_def->toKoopaIR(stmts, var_type);
+    }
+    return nullptr;
+}
+
 void BTypeAST::Dump() const {
     std::cout << "BTypeAST { " << type << " }";
 }
 
 void *BTypeAST::toKoopaIR() const {
-    if(type == "int") {
+    if(type == "INT") {
         koopa_raw_type_kind_t *ir = new koopa_raw_type_kind_t;
         ir->tag = KOOPA_RTT_INT32;
         return ir;
@@ -144,7 +173,45 @@ void ConstDefAST::Dump() const {
 
 void *ConstDefAST::toKoopaIR(std::vector<const void *> &stmts) const {
     int val = const_init_val->calculate();
-    symbol_list.addSymbol(ident, val);
+    Value value(ValueType::Const, val);
+    symbol_list.addSymbol(ident, value);
+    return nullptr;
+}
+
+void VarDefAST::Dump() const {
+    std::cout << "VarDefAST { ";
+    std::cout << ident << ", ";
+    if(var_init_val) {
+        var_init_val->Dump();
+    }
+    std::cout << " }";
+}
+
+void *VarDefAST::toKoopaIR(std::vector<const void *> &stmts, koopa_raw_type_t type) const {
+    std::cout<<"enter var def to koopa ir\n";
+    koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
+    ir->name = add_prefix("@", ident.c_str());
+    ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+    ir->ty = make_pointer_ty(KOOPA_RTT_INT32);
+    ir->kind.tag = KOOPA_RVT_ALLOC;
+    stmts.push_back(ir);
+    std::cout<<"enter var def to koopa ir 1\n";
+    Value value(ValueType::Var, ir);
+    symbol_list.addSymbol(ident, value);
+    std::cout<<"enter var def to koopa ir 2\n";
+    if(var_init_val!=nullptr) {
+        std::cout<<"not nullptr\n";
+        koopa_raw_value_data_t *ir2 = new koopa_raw_value_data_t;
+        ir2->name = nullptr;
+        ir2->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        ir2->ty = make_ty(KOOPA_RTT_INT32);
+        ir2->kind.tag = KOOPA_RVT_STORE;
+        ir2->kind.data.store.dest = (koopa_raw_value_t)ir;
+        std::cout<<"enter var def to koopa ir 3\n";
+        ir2->kind.data.store.value = (koopa_raw_value_t)(var_init_val->toKoopaIR(stmts));
+        std::cout<<"enter var def to koopa ir 4\n";
+        stmts.push_back(ir2);
+    }
     return nullptr;
 }
 
@@ -162,30 +229,44 @@ int ConstInitValAST::calculate() const {
     return const_exp->calculate();
 }
 
+void InitValAST::Dump() const {
+    std::cout << "InitValAST { ";
+    exp->Dump();
+    std::cout << " }";
+}
+
+void *InitValAST::toKoopaIR(std::vector<const void *> &stmts) const {
+    std::cout<<"enter init val to koopa ir\n";
+    return exp->toKoopaIR(stmts);
+}
+
+int InitValAST::calculate() const {
+    return exp->calculate();
+}
+
 // StmtAST 类的实现
 void StmtAST::Dump() const {
-    std::cout << "StmtAST { "<< Return << ", ";
+    std::cout << "StmtAST { "<< stmt_type << ", ";
     exp->Dump();
     std::cout << " }";
 }
 
 void *StmtAST::toKoopaIR(std::vector<const void *> &stmts) const {
     koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
-
     ir->name = nullptr;
     ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
     ir->ty = make_ty(KOOPA_RTT_UNIT);
-    ir->kind.tag = KOOPA_RVT_RETURN;
-/*
-    koopa_raw_value_data_t *value = new koopa_raw_value_data_t;
-    value->name = nullptr;
-    value->ty = make_ty(KOOPA_RTT_INT32);
-    value->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-    value->kind.tag = KOOPA_RVT_INTEGER;
-    value->kind.data.integer.value = number; 
-*/
-    ir->kind.data.ret.value = (koopa_raw_value_data_t *)exp->toKoopaIR(stmts);
-    stmts.push_back(ir);
+    if(stmt_type == "RETURN") {
+        ir->kind.tag = KOOPA_RVT_RETURN;
+        ir->kind.data.ret.value = (koopa_raw_value_data_t *)exp->toKoopaIR(stmts);
+        stmts.push_back(ir);
+    }
+    else if(stmt_type == "ASSIGN") {
+        ir->kind.tag = KOOPA_RVT_STORE;
+        ir->kind.data.store.dest = (koopa_raw_value_t)lval->getKoopaIR();
+        ir->kind.data.store.value = (koopa_raw_value_t)exp->toKoopaIR(stmts);
+        stmts.push_back(ir);
+    }
     return ir;
 }
 
@@ -622,7 +703,7 @@ void *PrimaryExpAST::toKoopaIR(std::vector<const void *> &stmts) const {
         return number->toKoopaIR();
     }
     else if(tag == "LVAL") {
-        return lval->toKoopaIR();
+        return lval->toKoopaIR(stmts);
     }
     return nullptr;
 }
@@ -655,23 +736,37 @@ void PrimaryExpAST::Dump() const {
 }
 
 // LValAST 类的实现
-void *LValAST::toKoopaIR() const {
-    int value = symbol_list.getSymbol(ident);
+void *LValAST::toKoopaIR(std::vector<const void *> &stmts) const {
+    Value value = symbol_list.getSymbol(ident);
     koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
     ir->name = nullptr;
-    ir->ty = make_ty(KOOPA_RTT_INT32);
     ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-    ir->kind.tag = KOOPA_RVT_LOAD;
-    ir->kind.tag = KOOPA_RVT_INTEGER;
-    ir->kind.data.integer.value = value;
+    ir->ty = make_ty(KOOPA_RTT_INT32);
+    if(value.type == ValueType::Var) {
+        ir->kind.tag = KOOPA_RVT_LOAD;
+        ir->kind.data.integer.value = value.data.const_value;
+        stmts.push_back(ir);
+    }
+    else if(value.type == ValueType::Const) {
+        ir->kind.tag = KOOPA_RVT_INTEGER;
+        ir->kind.data.integer.value = value.data.const_value;
+    }
     return ir;
 }
 int LValAST::calculate() const {
-    return symbol_list.getSymbol(ident);
+    return symbol_list.getSymbol(ident).data.const_value;
 }
 
 void LValAST::Dump() const {
-    std::cout << "LValAST { " << ident << " = " << symbol_list.getSymbol(ident) << " }";
+    std::cout << "LValAST { " << ident << " }";
+}
+
+void *LValAST::getKoopaIR() const {
+    Value value = symbol_list.getSymbol(ident);
+    if(value.type == ValueType::Var) {
+        return (void *)value.data.var_value;
+    }
+    return nullptr;
 }
 
 // NumberAST 类的实现

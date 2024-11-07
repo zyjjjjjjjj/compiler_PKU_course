@@ -1,25 +1,31 @@
 #include "utils.h"
 
-void SymbolList::addSymbol(std::string symbol, int value) {
+void SymbolList::addSymbol(std::string symbol, Value value) {
     if(symbol_list_array.empty()) {
-        symbol_list_array.push_back(std::map<std::string, int>());
+        symbol_list_array.push_back(std::map<std::string, Value>());
     }
     symbol_list_array.back()[symbol] = value;
 }
 
-int SymbolList::getSymbol(std::string symbol) {
+Value SymbolList::getSymbol(std::string symbol) {
     for(auto it = symbol_list_array.rbegin(); it != symbol_list_array.rend(); it++) {
         if(it->find(symbol) != it->end()) {
             return it->at(symbol);
         }
     }
-    return -2;
+    assert(false);
 }
 
 void SymbolList::Dump() const {
-    for(auto &symbol_map : symbol_list_array) {
-        for(auto &symbol : symbol_map) {
-            std::cout << symbol.first << " : " << symbol.second << std::endl;
+    for(auto &symbol_list : symbol_list_array) {
+        for(auto &symbol : symbol_list) {
+            std::cout << symbol.first << " : ";
+            if(symbol.second.type == Const) {
+                std::cout << symbol.second.data.const_value << std::endl;
+            }
+            else if(symbol.second.type == Var) {
+                std::cout << symbol.second.data.var_value << std::endl;
+            }
         }
     }
 }
@@ -49,6 +55,13 @@ koopa_raw_type_kind_t *make_func_ty(std::vector<const void *> *buf, const koopa_
 koopa_raw_type_kind_t *make_ty(koopa_raw_type_tag_t tag) {
     koopa_raw_type_kind_t *ty = new koopa_raw_type_kind_t;
     ty->tag = tag;
+    return ty;
+}
+
+koopa_raw_type_kind_t *make_pointer_ty(koopa_raw_type_tag_t tag) {
+    koopa_raw_type_kind_t *ty = new koopa_raw_type_kind_t;
+    ty->tag = KOOPA_RTT_POINTER;
+    ty->data.pointer.base = make_ty(tag);
     return ty;
 }
 

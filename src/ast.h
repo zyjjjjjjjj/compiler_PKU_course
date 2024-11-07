@@ -17,7 +17,9 @@ class BaseAST {
   virtual void Dump() const = 0;
   virtual void *toKoopaIR() const { return nullptr; };
   virtual void *toKoopaIR(std::vector<const void *> &stmts) const { return nullptr; };
+  virtual void *toKoopaIR(std::vector<const void *> &stmts, koopa_raw_type_t type) const { return nullptr; };
   virtual int calculate() const { return 0; };
+  virtual void *getKoopaIR() const { return nullptr; };
 };
 
 // CompUnitAST 派生类
@@ -72,6 +74,8 @@ class BlockItemAST : public BaseAST {
 class DeclAST : public BaseAST {
  public:
   std::unique_ptr<BaseAST> const_decl;
+  std::unique_ptr<BaseAST> var_decl;
+  std::string decl_type;
 
   void Dump() const override;
   void *toKoopaIR(std::vector<const void *> &stmts) const override;
@@ -81,6 +85,15 @@ class ConstDeclAST : public BaseAST {
  public:
   std::unique_ptr<BaseAST> type;
   std::unique_ptr<std::vector<std::unique_ptr<BaseAST>>> const_def_array;
+
+  void Dump() const override;
+  void *toKoopaIR(std::vector<const void *> &stmts) const override;
+};
+
+class VarDeclAST : public BaseAST {
+ public:
+  std::unique_ptr<BaseAST> type;
+  std::unique_ptr<std::vector<std::unique_ptr<BaseAST>>> var_def_array;
 
   void Dump() const override;
   void *toKoopaIR(std::vector<const void *> &stmts) const override;
@@ -103,6 +116,15 @@ class ConstDefAST : public BaseAST {
   void *toKoopaIR(std::vector<const void *> &stmts) const override;
 };
 
+class VarDefAST : public BaseAST {
+ public:
+  std::string ident;
+  std::unique_ptr<BaseAST> var_init_val;
+
+  void Dump() const override;
+  void *toKoopaIR(std::vector<const void *> &stmts, koopa_raw_type_t type) const override;
+};
+
 class ConstInitValAST : public BaseAST {
  public:
   std::unique_ptr<BaseAST> const_exp;
@@ -113,11 +135,21 @@ class ConstInitValAST : public BaseAST {
 
 };
 
+class InitValAST : public BaseAST {
+ public:
+  std::unique_ptr<BaseAST> exp;
+
+  void Dump() const override;
+  void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  int calculate() const override;
+};
+
 // StmtAST 派生类
 class StmtAST : public BaseAST {
  public:
-  std::string Return;
+  std::string stmt_type;
   std::unique_ptr<BaseAST> exp;
+  std::unique_ptr<BaseAST> lval;
 
   void Dump() const override;
   void *toKoopaIR(std::vector<const void *> &stmts) const override;
@@ -251,6 +283,7 @@ class LValAST : public BaseAST {
   std::string ident;
 
   void Dump() const override;
-  void *toKoopaIR() const override;
+  void *toKoopaIR(std::vector<const void *> &stmts) const override;
   int calculate() const override;
+  void *getKoopaIR() const override;
 };
