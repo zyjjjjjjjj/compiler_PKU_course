@@ -176,13 +176,13 @@ ConstDefArray
   : ConstDef {
     auto vec = new std::vector<std::unique_ptr<BaseAST>> ();
     auto const_def = std::unique_ptr<BaseAST>($1);
-    vec->push_back(std::move(const_def));
+    vec->insert(vec->begin(), std::move(const_def));
     $$ = vec;
   }
   | ConstDef ',' ConstDefArray {
     auto vec =(std::vector<std::unique_ptr<BaseAST>>*)($3);
     auto const_def = std::unique_ptr<BaseAST>($1);
-    vec->push_back(std::move(const_def));
+    vec->insert(vec->begin(), std::move(const_def));
     $$ = vec;
   }
   ;
@@ -191,13 +191,13 @@ VarDefArray
   : VarDef {
     auto vec = new std::vector<std::unique_ptr<BaseAST>> ();
     auto var_def = std::unique_ptr<BaseAST>($1);
-    vec->push_back(std::move(var_def));
+    vec->insert(vec->begin(), std::move(var_def));
     $$ = vec;
   }
   | VarDef ',' VarDefArray {
     auto vec =(std::vector<std::unique_ptr<BaseAST>>*)($3);
     auto var_def = std::unique_ptr<BaseAST>($1);
-    vec->push_back(std::move(var_def));
+    vec->insert(vec->begin(), std::move(var_def));
     $$ = vec;
   }
   ;

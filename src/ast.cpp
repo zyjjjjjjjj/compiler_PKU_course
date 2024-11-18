@@ -106,7 +106,6 @@ void DeclAST::Dump() const {
 }
 
 void *DeclAST::toKoopaIR(std::vector<const void *> &stmts) const {
-    std::cout<<"enter decl to koopa ir\n";
     if(decl_type == "CONST") {
         return const_decl->toKoopaIR(stmts);
     }
@@ -188,28 +187,22 @@ void VarDefAST::Dump() const {
 }
 
 void *VarDefAST::toKoopaIR(std::vector<const void *> &stmts, koopa_raw_type_t type) const {
-    std::cout<<"enter var def to koopa ir\n";
     koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
     ir->name = add_prefix("@", ident.c_str());
     ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
     ir->ty = make_pointer_ty(KOOPA_RTT_INT32);
     ir->kind.tag = KOOPA_RVT_ALLOC;
     stmts.push_back(ir);
-    std::cout<<"enter var def to koopa ir 1\n";
     Value value(ValueType::Var, ir);
     symbol_list.addSymbol(ident, value);
-    std::cout<<"enter var def to koopa ir 2\n";
     if(var_init_val!=nullptr) {
-        std::cout<<"not nullptr\n";
         koopa_raw_value_data_t *ir2 = new koopa_raw_value_data_t;
         ir2->name = nullptr;
         ir2->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-        ir2->ty = make_ty(KOOPA_RTT_INT32);
+        ir2->ty = make_ty(KOOPA_RTT_UNIT);//KOOPA_RTT_INT32?
         ir2->kind.tag = KOOPA_RVT_STORE;
         ir2->kind.data.store.dest = (koopa_raw_value_t)ir;
-        std::cout<<"enter var def to koopa ir 3\n";
         ir2->kind.data.store.value = (koopa_raw_value_t)(var_init_val->toKoopaIR(stmts));
-        std::cout<<"enter var def to koopa ir 4\n";
         stmts.push_back(ir2);
     }
     return nullptr;
@@ -236,7 +229,6 @@ void InitValAST::Dump() const {
 }
 
 void *InitValAST::toKoopaIR(std::vector<const void *> &stmts) const {
-    std::cout<<"enter init val to koopa ir\n";
     return exp->toKoopaIR(stmts);
 }
 
@@ -744,7 +736,8 @@ void *LValAST::toKoopaIR(std::vector<const void *> &stmts) const {
     ir->ty = make_ty(KOOPA_RTT_INT32);
     if(value.type == ValueType::Var) {
         ir->kind.tag = KOOPA_RVT_LOAD;
-        ir->kind.data.integer.value = value.data.const_value;
+        //ir->kind.data.integer.value = value.data.const_value;
+        ir->kind.data.load.src = (koopa_raw_value_t)value.data.var_value;
         stmts.push_back(ir);
     }
     else if(value.type == ValueType::Const) {
