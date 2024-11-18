@@ -62,6 +62,11 @@ void *BlockAST::toKoopaIR() const {
     std::vector<const void *> stmts;
     for(auto &block_item : *block_item_array) {
         block_item->toKoopaIR(stmts);
+        if((dynamic_cast<BlockItemAST *>(block_item.get()))->block_item_type == "STMT") {
+            if((dynamic_cast<StmtAST *>((dynamic_cast<BlockItemAST *>(block_item.get()))->stmt.get()))->stmt_type == "RETURN") {
+                break;
+            }
+        }
     }
     koopa_raw_basic_block_data_t *ir = new koopa_raw_basic_block_data_t;
     ir->name = add_prefix("%", "entry");
