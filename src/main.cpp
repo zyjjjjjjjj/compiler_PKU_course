@@ -35,7 +35,7 @@ int main(int argc, const char *argv[]) {
   assert(!ret);
 
   // 输出解析得到的 AST
-  ast->Dump();
+  //ast->Dump();
   cout<<endl;
 
   // 将 AST 转换为 IR
