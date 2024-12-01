@@ -69,8 +69,9 @@ void *BlockAST::toKoopaIR() const {
     if(block_item_array) {
         for(auto &block_item : *block_item_array) {
             block_item->toKoopaIR(stmts);
-            if((dynamic_cast<BlockItemAST *>(block_item.get()))->block_item_type == "STMT") {
-                if((dynamic_cast<StmtAST *>((dynamic_cast<BlockItemAST *>(block_item.get()))->stmt.get()))->stmt_type == "RETURN") {
+            if (stmts.size() > 0) {
+                auto inst = (koopa_raw_value_t)stmts.back();
+                if (inst->kind.tag == KOOPA_RVT_RETURN) {
                     break;
                 }
             }
@@ -91,8 +92,9 @@ void *BlockAST::toKoopaIR(std::vector<const void *> &stmts) const {
     if(block_item_array) {
         for(auto &block_item : *block_item_array) {
             block_item->toKoopaIR(stmts);
-            if((dynamic_cast<BlockItemAST *>(block_item.get()))->block_item_type == "STMT") {
-                if((dynamic_cast<StmtAST *>((dynamic_cast<BlockItemAST *>(block_item.get()))->stmt.get()))->stmt_type == "RETURN") {
+            if (stmts.size() > 0) {
+                auto inst = (koopa_raw_value_t)stmts.back();
+                if (inst->kind.tag == KOOPA_RVT_RETURN) {
                     break;
                 }
             }
