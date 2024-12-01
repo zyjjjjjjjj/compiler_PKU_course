@@ -293,6 +293,11 @@ Exp
     ast->lor_exp = unique_ptr<BaseAST>($1);
     $$ = ast;
   }
+  | '{' Exp '}' {
+    auto ast = new ExpAST();
+    ast->lor_exp = unique_ptr<BaseAST>($2);
+    $$ = ast;
+  }
   ;
 
 LOrExp
