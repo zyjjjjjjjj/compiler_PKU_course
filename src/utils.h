@@ -30,6 +30,8 @@ public:
   ~SymbolList() = default;
   void addSymbol(std::string symbol, Value value);
   Value getSymbol(std::string symbol);
+  void newScope();
+  void deleteScope();
   void Dump() const;
 };
 

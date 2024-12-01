@@ -26,7 +26,9 @@ void FuncDefAST::Dump() const {
 }
 
 void *FuncDefAST::toKoopaIR() const {
+    symbol_list.newScope();
     std::vector<const void *> blocks{block->toKoopaIR()};
+    symbol_list.deleteScope();
     koopa_raw_function_data_t *ir = new koopa_raw_function_data_t;
     ir->name = add_prefix("@", ident.c_str());
     ir->ty = make_func_ty(nullptr, (const koopa_raw_type_kind *)func_type->toKoopaIR());
@@ -52,23 +54,54 @@ void *FuncTypeAST::toKoopaIR() const {
 // BlockAST 类的实现
 void BlockAST::Dump() const {
     std::cout << "BlockAST { ";
-    for(auto &block_item : *block_item_array) {
-        block_item->Dump();
+    if(block_item_array) {
+        for(auto &block_item : *block_item_array) {
+            block_item->Dump();
+        }
     }
     std::cout << " }";
 }
 
 void *BlockAST::toKoopaIR() const {
+    std::cout<<"new block\n";
     std::vector<const void *> stmts;
-    for(auto &block_item : *block_item_array) {
-        block_item->toKoopaIR(stmts);
-        if((dynamic_cast<BlockItemAST *>(block_item.get()))->block_item_type == "STMT") {
-            if((dynamic_cast<StmtAST *>((dynamic_cast<BlockItemAST *>(block_item.get()))->stmt.get()))->stmt_type == "RETURN") {
-                break;
+    koopa_raw_basic_block_data_t *ir = new koopa_raw_basic_block_data_t;
+    if(block_item_array) {
+        for(auto &block_item : *block_item_array) {
+            block_item->toKoopaIR(stmts);
+            if((dynamic_cast<BlockItemAST *>(block_item.get()))->block_item_type == "STMT") {
+                if((dynamic_cast<StmtAST *>((dynamic_cast<BlockItemAST *>(block_item.get()))->stmt.get()))->stmt_type == "RETURN") {
+                    break;
+                }
             }
         }
+        ir->insts = make_slice(&stmts, KOOPA_RSIK_VALUE);
     }
+    else {
+        ir->insts = make_slice(nullptr, KOOPA_RSIK_VALUE);
+    }
+    ir->name = add_prefix("%", "entry");
+    ir->params = make_slice(nullptr, KOOPA_RSIK_VALUE);
+    ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+    return ir;
+}
+
+void *BlockAST::toKoopaIR(std::vector<const void *> &stmts) const {
     koopa_raw_basic_block_data_t *ir = new koopa_raw_basic_block_data_t;
+    if(block_item_array) {
+        for(auto &block_item : *block_item_array) {
+            block_item->toKoopaIR(stmts);
+            if((dynamic_cast<BlockItemAST *>(block_item.get()))->block_item_type == "STMT") {
+                if((dynamic_cast<StmtAST *>((dynamic_cast<BlockItemAST *>(block_item.get()))->stmt.get()))->stmt_type == "RETURN") {
+                    break;
+                }
+            }
+        }
+        ir->insts = make_slice(&stmts, KOOPA_RSIK_VALUE);
+    }
+    else {
+        ir->insts = make_slice(nullptr, KOOPA_RSIK_VALUE);
+    }
     ir->name = add_prefix("%", "entry");
     ir->params = make_slice(nullptr, KOOPA_RSIK_VALUE);
     ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
@@ -244,7 +277,22 @@ int InitValAST::calculate() const {
 // StmtAST 类的实现
 void StmtAST::Dump() const {
     std::cout << "StmtAST { "<< stmt_type << ", ";
-    exp->Dump();
+    if(stmt_type == "RETURN") {
+        if(exp) {
+            exp->Dump();
+        }
+    }
+    else if(stmt_type == "ASSIGN") {
+        lval->Dump();
+        std::cout << " = ";
+        exp->Dump();
+    }
+    else if(stmt_type == "EXP") {
+        exp->Dump();
+    }
+    else if(stmt_type == "BLOCK") {
+        block->Dump();
+    }
     std::cout << " }";
 }
 
@@ -255,7 +303,12 @@ void *StmtAST::toKoopaIR(std::vector<const void *> &stmts) const {
     ir->ty = make_ty(KOOPA_RTT_UNIT);
     if(stmt_type == "RETURN") {
         ir->kind.tag = KOOPA_RVT_RETURN;
-        ir->kind.data.ret.value = (koopa_raw_value_data_t *)exp->toKoopaIR(stmts);
+        if(exp) {
+            ir->kind.data.ret.value = (koopa_raw_value_data_t *)exp->toKoopaIR(stmts);
+        }
+        else {
+            ir->kind.data.ret.value = nullptr;
+        }
         stmts.push_back(ir);
     }
     else if(stmt_type == "ASSIGN") {
@@ -263,6 +316,17 @@ void *StmtAST::toKoopaIR(std::vector<const void *> &stmts) const {
         ir->kind.data.store.dest = (koopa_raw_value_t)lval->getKoopaIR();
         ir->kind.data.store.value = (koopa_raw_value_t)exp->toKoopaIR(stmts);
         stmts.push_back(ir);
+    }
+    else if(stmt_type == "EXP") {
+        return exp->toKoopaIR(stmts);
+    }
+    else if(stmt_type == "BLOCK") {
+        symbol_list.newScope();
+        block->toKoopaIR(stmts);
+        symbol_list.deleteScope();
+    }
+    else if(stmt_type == "EMPTY") {
+        return nullptr;
     }
     return ir;
 }

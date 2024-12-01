@@ -58,6 +58,7 @@ class BlockAST : public BaseAST {
 
   void Dump() const override;
   void *toKoopaIR() const override;
+  void *toKoopaIR(std::vector<const void *> &stmts) const override;
 };
 
 class BlockItemAST : public BaseAST {
@@ -150,6 +151,7 @@ class StmtAST : public BaseAST {
   std::string stmt_type;
   std::unique_ptr<BaseAST> exp;
   std::unique_ptr<BaseAST> lval;
+  std::unique_ptr<BaseAST> block;
 
   void Dump() const override;
   void *toKoopaIR(std::vector<const void *> &stmts) const override;

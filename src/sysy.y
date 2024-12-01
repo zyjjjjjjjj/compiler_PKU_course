@@ -99,7 +99,9 @@ Block
     $$ = ast;
   }
   | '{' '}' {
-    $$ = new BlockAST();
+    auto ast = new BlockAST();
+    ast->block_item_array = nullptr;
+    $$ = ast;
   }
   ;
 
@@ -247,11 +249,34 @@ Stmt
     ast->exp = unique_ptr<BaseAST>($2);
     $$ = ast;
   }
+  | RETURN ';' {
+    auto ast = new StmtAST();
+    ast->stmt_type = *new string("RETURN");
+    ast->exp = nullptr;
+    $$ = ast;
+  }
   | LVal '=' Exp ';' {
     auto ast = new StmtAST();
     ast->lval = unique_ptr<BaseAST>($1);
     ast->exp = unique_ptr<BaseAST>($3);
     ast->stmt_type = *new string("ASSIGN");
+    $$ = ast;
+  }
+  | Exp ';' {
+    auto ast = new StmtAST();
+    ast->exp = unique_ptr<BaseAST>($1);
+    ast->stmt_type = *new string("EXP");
+    $$ = ast;
+  }
+  | ';' {
+    auto ast = new StmtAST();
+    ast->stmt_type = *new string("EMPTY");
+    $$ = ast;
+  }
+  | Block {
+    auto ast = new StmtAST();
+    ast->block = unique_ptr<BaseAST>($1);
+    ast->stmt_type = *new string("BLOCK");
     $$ = ast;
   }
 

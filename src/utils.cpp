@@ -16,6 +16,14 @@ Value SymbolList::getSymbol(std::string symbol) {
     assert(false);
 }
 
+void SymbolList::newScope() {
+    symbol_list_array.push_back(std::map<std::string, Value>());
+}
+
+void SymbolList::deleteScope() {
+    symbol_list_array.pop_back();
+}
+
 void SymbolList::Dump() const {
     for(auto &symbol_list : symbol_list_array) {
         for(auto &symbol : symbol_list) {
