@@ -469,6 +469,8 @@ void *StmtAST::toKoopaIR() const {
     else if(stmt_type == "BRANCH")
     {
         ir = (koopa_raw_value_data *)if_stmt->toKoopaIR();
+        bool ifblock_might_comeback = block_manager.willBlockReturn();
+        bool elseblock_might_comeback = true;
 
         koopa_raw_basic_block_data_t *else_block = new koopa_raw_basic_block_data_t;
         else_block->name = add_prefix("%", "else");
@@ -485,17 +487,26 @@ void *StmtAST::toKoopaIR() const {
         {
             ir->kind.data.branch.false_bb = (koopa_raw_basic_block_t)else_block;
             ir->kind.data.branch.false_args = make_slice(nullptr, KOOPA_RSIK_VALUE);
-            block_manager.addInst(jumpInst((koopa_raw_basic_block_t)end_block));
+            if(ifblock_might_comeback)
+            {
+                block_manager.addInst(jumpInst((koopa_raw_basic_block_t)end_block));
+            }
             block_manager.newBlock(else_block);
             else_stmt->toKoopaIR();
+            elseblock_might_comeback = block_manager.willBlockReturn();
         }
         else
         {
             ir->kind.data.branch.false_bb = (koopa_raw_basic_block_t)end_block;
         }
-
-        block_manager.addInst(jumpInst((koopa_raw_basic_block_t)end_block));
-        block_manager.newBlock(end_block);
+        if(elseblock_might_comeback)
+        {
+            block_manager.addInst(jumpInst((koopa_raw_basic_block_t)end_block));
+        }
+        if(ifblock_might_comeback || elseblock_might_comeback)
+        {
+            block_manager.newBlock(end_block);
+        }
     }
     else if(stmt_type == "EMPTY") {
         return nullptr;

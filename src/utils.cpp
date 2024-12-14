@@ -61,6 +61,22 @@ void BlockManager::newBlock(koopa_raw_basic_block_data_t *basic_block) {
     return;
 }
 
+bool BlockManager::willBlockReturn() {
+    if (block_list->size() > 0 && inst_buf.size() > 0) 
+    {
+        for (int i = 0; i < inst_buf.size(); i++) 
+        {
+            koopa_raw_value_t inst = (koopa_raw_value_t)inst_buf[i];
+            if (inst->kind.tag == KOOPA_RVT_RETURN ||
+                inst->kind.tag == KOOPA_RVT_JUMP ||
+                inst->kind.tag == KOOPA_RVT_BRANCH) {
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
 void SymbolList::addSymbol(std::string symbol, Value value) {
     if(symbol_list_array.empty()) {
         symbol_list_array.push_back(std::map<std::string, Value>());

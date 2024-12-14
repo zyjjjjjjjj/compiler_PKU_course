@@ -17,6 +17,7 @@ public:
   void newBlock(koopa_raw_basic_block_data_t *basic_block);
   void popBuffer();
   void addInst(const void *inst);
+  bool willBlockReturn();
   void Dump() const;
 };
 
