@@ -6,6 +6,8 @@
 #include <cstring>
 #include <stdio.h>
 
+koopa_raw_value_data *jumpInst(koopa_raw_basic_block_t target);
+
 class BlockManager {
 private:
   std::vector<const void *> *block_list;

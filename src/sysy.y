@@ -283,14 +283,15 @@ Stmt
   | If {
     auto ast = new StmtAST();
     ast->if_stmt = unique_ptr<BaseAST>($1);
-    ast->stmt_type = *new string("IF");
+    ast->else_stmt = nullptr;
+    ast->stmt_type = *new string("BRANCH");
     $$ = ast;
   }
   | If ELSE Stmt {
     auto ast = new StmtAST();
     ast->if_stmt = unique_ptr<BaseAST>($1);
     ast->else_stmt = unique_ptr<BaseAST>($3);
-    ast->stmt_type = *new string("IFELSE");
+    ast->stmt_type = *new string("BRANCH");
     $$ = ast;
   }
   ;

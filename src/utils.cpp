@@ -1,22 +1,33 @@
 #include "utils.h"
 
+koopa_raw_value_data *jumpInst(koopa_raw_basic_block_t target) {
+    koopa_raw_value_data *ir = new koopa_raw_value_data;
+    ir->kind.tag = KOOPA_RVT_JUMP;
+    ir->kind.data.jump.target = target;
+    ir->kind.data.jump.args = make_slice(nullptr, KOOPA_RSIK_VALUE);
+    ir->name = nullptr;
+    ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+    ir->ty = make_ty(KOOPA_RTT_UNIT);
+    return ir;
+}
+
 void BlockManager::init(std::vector<const void *> *block_list) {
     this->block_list = block_list;
     return;
 }
 
 void BlockManager::addInst(const void *inst) {
-    std::cout << "addInst" << std::endl;
     inst_buf.push_back(inst);
     return;
 }
 
 void BlockManager::popBuffer() {
     if(block_list->size() > 0)
-    {
+    {//如果之前有newblock
         if(inst_buf.size() > 0) 
-        {
+        {//若缓冲区中有代码
             koopa_raw_basic_block_data_t *last_block = (koopa_raw_basic_block_data_t *)block_list->back();
+            //找到第一个控制指令，强制其为block末尾
             for (size_t i = 0; i < inst_buf.size(); i++) {
                 koopa_raw_value_t inst = (koopa_raw_value_t)inst_buf[i];
                 if (inst->kind.tag == KOOPA_RVT_RETURN ||
@@ -27,12 +38,14 @@ void BlockManager::popBuffer() {
                     break;
                 }
             }
+            //将缓冲区中的代码推入block，前一个block的insts应该为空
+            assert(last_block->insts.buffer == nullptr);
             if(!last_block->insts.buffer) {
                 last_block->insts = make_slice(&inst_buf, KOOPA_RSIK_VALUE);
             }
             inst_buf.clear();
         }
-        else {
+        else {//若缓冲区中为空，说明block中没有任何语句，直接删除即可
             block_list->pop_back();
         }
     }
@@ -40,7 +53,8 @@ void BlockManager::popBuffer() {
 }
 
 void BlockManager::newBlock(koopa_raw_basic_block_data_t *basic_block) {
-    popBuffer();
+    std::cout<<"new block"<<basic_block->name<<std::endl;
+    popBuffer();//创建新block前要将缓冲区中的代码推入前一个block
     basic_block->insts.buffer = nullptr;
     basic_block->insts.len = 0;
     block_list->push_back(basic_block);

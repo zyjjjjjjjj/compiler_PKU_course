@@ -443,7 +443,6 @@ void *StmtAST::toKoopaIR() const {
     ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
     ir->ty = make_ty(KOOPA_RTT_UNIT);
     if(stmt_type == "RETURN") {
-        std::cout << "RETURN" << std::endl;
         ir->kind.tag = KOOPA_RVT_RETURN;
         if(exp) {
             ir->kind.data.ret.value = (koopa_raw_value_data_t *)exp->toKoopaIR();
@@ -467,6 +466,37 @@ void *StmtAST::toKoopaIR() const {
         block->toKoopaIR();
         symbol_list.deleteScope();
     }
+    else if(stmt_type == "BRANCH")
+    {
+        ir = (koopa_raw_value_data *)if_stmt->toKoopaIR();
+
+        koopa_raw_basic_block_data_t *else_block = new koopa_raw_basic_block_data_t;
+        else_block->name = add_prefix("%", "else");
+        else_block->params = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        else_block->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+
+        koopa_raw_basic_block_data_t *end_block = new koopa_raw_basic_block_data_t;
+        end_block->name = add_prefix("%", "end");
+        end_block->params = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        end_block->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+
+        ir->kind.data.branch.false_args = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        if(else_stmt != nullptr)
+        {
+            ir->kind.data.branch.false_bb = (koopa_raw_basic_block_t)else_block;
+            ir->kind.data.branch.false_args = make_slice(nullptr, KOOPA_RSIK_VALUE);
+            block_manager.addInst(jumpInst((koopa_raw_basic_block_t)end_block));
+            block_manager.newBlock(else_block);
+            else_stmt->toKoopaIR();
+        }
+        else
+        {
+            ir->kind.data.branch.false_bb = (koopa_raw_basic_block_t)end_block;
+        }
+
+        block_manager.addInst(jumpInst((koopa_raw_basic_block_t)end_block));
+        block_manager.newBlock(end_block);
+    }
     else if(stmt_type == "EMPTY") {
         return nullptr;
     }
@@ -482,7 +512,22 @@ void IfAST::Dump() const {
 }
 
 void *IfAST::toKoopaIR() const {
-    return nullptr;
+    koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
+    ir->name = nullptr;
+    ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+    ir->ty = make_ty(KOOPA_RTT_UNIT);
+    ir->kind.tag = KOOPA_RVT_BRANCH;
+    ir->kind.data.branch.cond = (koopa_raw_value_t)exp->toKoopaIR();
+    block_manager.addInst(ir);
+    koopa_raw_basic_block_data_t *if_block = new koopa_raw_basic_block_data_t;
+    if_block->name = add_prefix("%", "then");
+    if_block->params = make_slice(nullptr, KOOPA_RSIK_VALUE);
+    if_block->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+    ir->kind.data.branch.true_bb = (koopa_raw_basic_block_t)if_block;
+    ir->kind.data.branch.true_args = make_slice(nullptr, KOOPA_RSIK_VALUE);
+    block_manager.newBlock(if_block);
+    stmt->toKoopaIR();
+    return ir;
 }
 
 void ConstExpAST::Dump() const {
