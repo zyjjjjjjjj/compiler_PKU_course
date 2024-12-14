@@ -38,13 +38,14 @@ using namespace std;
 
 // lexer 返回的所有 token 种类的声明
 // 注意 IDENT 和 INT_CONST 会返回 token 的值, 分别对应 str_val 和 int_val
-%token INT RETURN CONST
+%token INT RETURN CONST IF ELSE
 %token <str_val> IDENT
 %token <int_val> INT_CONST
 
 // 非终结符的类型定义
 %type <ast_val> FuncDef FuncType Block Stmt Exp LOrExp LAndExp EqExp RelExp AddExp MulExp UnaryExp PrimaryExp Number
 %type <ast_val> BlockItem Decl ConstDecl VarDecl ConstDef VarDef ConstInitVal InitVal ConstExp LVal BType
+%type <ast_val> If
 %type <ast_vec> ConstDefArray BlockItemArray VarDefArray
 %type <str_val> UnaryOp
 
@@ -279,6 +280,29 @@ Stmt
     ast->stmt_type = *new string("BLOCK");
     $$ = ast;
   }
+  | If {
+    auto ast = new StmtAST();
+    ast->if_stmt = unique_ptr<BaseAST>($1);
+    ast->stmt_type = *new string("IF");
+    $$ = ast;
+  }
+  | If ELSE Stmt {
+    auto ast = new StmtAST();
+    ast->if_stmt = unique_ptr<BaseAST>($1);
+    ast->else_stmt = unique_ptr<BaseAST>($3);
+    ast->stmt_type = *new string("IFELSE");
+    $$ = ast;
+  }
+  ;
+
+If
+  : IF '(' Exp ')' Stmt {
+    auto ast = new IfAST();
+    ast->exp = unique_ptr<BaseAST>($3);
+    ast->stmt = unique_ptr<BaseAST>($5);
+    $$ = ast;
+  }
+  ;
 
 ConstExp
   : Exp {
@@ -286,6 +310,7 @@ ConstExp
     ast->exp = unique_ptr<BaseAST>($1);
     $$ = ast;
   }
+  ;
 
 Exp
   : LOrExp {

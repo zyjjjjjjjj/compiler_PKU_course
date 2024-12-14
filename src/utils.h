@@ -6,6 +6,18 @@
 #include <cstring>
 #include <stdio.h>
 
+class BlockManager {
+private:
+  std::vector<const void *> *block_list;
+  std::vector<const void *> inst_buf;
+public:
+  void init(std::vector<const void *> *block_list);
+  void newBlock(koopa_raw_basic_block_data_t *basic_block);
+  void popBuffer();
+  void addInst(const void *inst);
+  void Dump() const;
+};
+
 enum ValueType { Const, Var};
 
 struct Value {

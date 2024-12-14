@@ -8,6 +8,7 @@
 #include "utils.h"
 
 static SymbolList symbol_list;
+static BlockManager block_manager;
 
 // 基类声明
 class BaseAST {
@@ -18,6 +19,7 @@ class BaseAST {
   virtual void *toKoopaIR() const { return nullptr; };
   virtual void *toKoopaIR(std::vector<const void *> &stmts) const { return nullptr; };
   virtual void *toKoopaIR(std::vector<const void *> &stmts, koopa_raw_type_t type) const { return nullptr; };
+  virtual void *toKoopaIR(koopa_raw_type_t type) const { return nullptr; };
   virtual int calculate() const { return 0; };
   virtual void *getKoopaIR() const { return nullptr; };
 };
@@ -68,7 +70,8 @@ class BlockItemAST : public BaseAST {
   std::string block_item_type;
 
   void Dump() const override;
-  void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  //void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  void *toKoopaIR() const override;
 };
 
 
@@ -79,7 +82,8 @@ class DeclAST : public BaseAST {
   std::string decl_type;
 
   void Dump() const override;
-  void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  //void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  void *toKoopaIR() const override;
 };
 
 class ConstDeclAST : public BaseAST {
@@ -88,7 +92,8 @@ class ConstDeclAST : public BaseAST {
   std::unique_ptr<std::vector<std::unique_ptr<BaseAST>>> const_def_array;
 
   void Dump() const override;
-  void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  //void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  void *toKoopaIR() const override;
 };
 
 class VarDeclAST : public BaseAST {
@@ -97,7 +102,8 @@ class VarDeclAST : public BaseAST {
   std::unique_ptr<std::vector<std::unique_ptr<BaseAST>>> var_def_array;
 
   void Dump() const override;
-  void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  //void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  void *toKoopaIR() const override;
 };
 
 class BTypeAST : public BaseAST {
@@ -114,7 +120,8 @@ class ConstDefAST : public BaseAST {
   std::unique_ptr<BaseAST> const_init_val;
 
   void Dump() const override;
-  void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  //void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  void *toKoopaIR() const override;
 };
 
 class VarDefAST : public BaseAST {
@@ -123,7 +130,8 @@ class VarDefAST : public BaseAST {
   std::unique_ptr<BaseAST> var_init_val;
 
   void Dump() const override;
-  void *toKoopaIR(std::vector<const void *> &stmts, koopa_raw_type_t type) const override;
+  //void *toKoopaIR(std::vector<const void *> &stmts, koopa_raw_type_t type) const override;
+  void *toKoopaIR(koopa_raw_type_t type) const override;
 };
 
 class ConstInitValAST : public BaseAST {
@@ -131,7 +139,8 @@ class ConstInitValAST : public BaseAST {
   std::unique_ptr<BaseAST> const_exp;
 
   void Dump() const override;
-  void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  //void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  void *toKoopaIR() const override;
   int calculate() const override;
 
 };
@@ -141,7 +150,8 @@ class InitValAST : public BaseAST {
   std::unique_ptr<BaseAST> exp;
 
   void Dump() const override;
-  void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  //void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  void *toKoopaIR() const override;
   int calculate() const override;
 };
 
@@ -152,9 +162,22 @@ class StmtAST : public BaseAST {
   std::unique_ptr<BaseAST> exp;
   std::unique_ptr<BaseAST> lval;
   std::unique_ptr<BaseAST> block;
+  std::unique_ptr<BaseAST> if_stmt;
+  std::unique_ptr<BaseAST> else_stmt;
 
   void Dump() const override;
-  void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  //void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  void *toKoopaIR() const override;
+};
+
+class IfAST : public BaseAST {
+ public:
+  std::unique_ptr<BaseAST> exp;
+  std::unique_ptr<BaseAST> stmt;
+
+  void Dump() const override;
+  //void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  void *toKoopaIR() const override;
 };
 
 class ConstExpAST : public BaseAST {
@@ -162,7 +185,8 @@ class ConstExpAST : public BaseAST {
   std::unique_ptr<BaseAST> exp;
 
   void Dump() const override;
-  void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  //void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  void *toKoopaIR() const override;
   int calculate() const override;
 };
 
@@ -171,7 +195,8 @@ class ExpAST : public BaseAST {
   std::unique_ptr<BaseAST> lor_exp;
 
   void Dump() const override;
-  void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  //void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  void *toKoopaIR() const override;
   int calculate() const override;
 };
 
@@ -182,8 +207,10 @@ class LOrExpAST : public BaseAST {
   std::unique_ptr<BaseAST> land_exp;
 
   void Dump() const override;
-  void *toKoopaIR(std::vector<const void *> &stmts) const override;
-  void *toBoolKoopaIR(const std::unique_ptr<BaseAST> &exp, std::vector<const void *> &stmts) const;
+  //void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  void *toKoopaIR() const override;
+  //void *toBoolKoopaIR(const std::unique_ptr<BaseAST> &exp, std::vector<const void *> &stmts) const;
+  void *toBoolKoopaIR(const std::unique_ptr<BaseAST> &exp) const;
   int calculate() const override;
 };
 
@@ -194,8 +221,10 @@ class LAndExpAST : public BaseAST {
   std::unique_ptr<BaseAST> eq_exp;
 
   void Dump() const override;
-  void *toKoopaIR(std::vector<const void *> &stmts) const override;
-  void *toBoolKoopaIR(const std::unique_ptr<BaseAST> &exp, std::vector<const void *> &stmts) const;
+  //void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  //void *toBoolKoopaIR(const std::unique_ptr<BaseAST> &exp, std::vector<const void *> &stmts) const;
+  void *toKoopaIR() const override;
+  void *toBoolKoopaIR(const std::unique_ptr<BaseAST> &exp) const;
   int calculate() const override;
 };
 
@@ -206,7 +235,8 @@ class EqExpAST : public BaseAST {
   std::unique_ptr<BaseAST> rel_exp;
 
   void Dump() const override;
-  void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  //void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  void *toKoopaIR() const override;
   int calculate() const override;
 };
 
@@ -217,7 +247,8 @@ class RelExpAST : public BaseAST {
   std::unique_ptr<BaseAST> add_exp;
 
   void Dump() const override;
-  void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  //void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  void *toKoopaIR() const override;
   int calculate() const override;
 };
 
@@ -228,7 +259,8 @@ class AddExpAST : public BaseAST {
   std::unique_ptr<BaseAST> mul_exp;
 
   void Dump() const override;
-  void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  //void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  void *toKoopaIR() const override;
   int calculate() const override;
 };
 
@@ -239,7 +271,8 @@ class MulExpAST : public BaseAST {
   std::unique_ptr<BaseAST> unary_exp;
 
   void Dump() const override;
-  void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  //void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  void *toKoopaIR() const override;
   int calculate() const override;
 };
 
@@ -251,7 +284,8 @@ class UnaryExpAST : public BaseAST {
   std::unique_ptr<BaseAST> primary_exp;
 
   void Dump() const override;
-  void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  //void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  void *toKoopaIR() const override;
   int calculate() const override;
 };
 
@@ -263,7 +297,8 @@ class PrimaryExpAST : public BaseAST {
   std::unique_ptr<BaseAST> lval;
 
   void Dump() const override;
-  void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  //void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  void *toKoopaIR() const override;
   int calculate() const override;
 };
 
@@ -285,7 +320,8 @@ class LValAST : public BaseAST {
   std::string ident;
 
   void Dump() const override;
-  void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  //void *toKoopaIR(std::vector<const void *> &stmts) const override;
+  void *toKoopaIR() const override;
   int calculate() const override;
   void *getKoopaIR() const override;
 };

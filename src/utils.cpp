@@ -1,5 +1,52 @@
 #include "utils.h"
 
+void BlockManager::init(std::vector<const void *> *block_list) {
+    this->block_list = block_list;
+    return;
+}
+
+void BlockManager::addInst(const void *inst) {
+    std::cout << "addInst" << std::endl;
+    inst_buf.push_back(inst);
+    return;
+}
+
+void BlockManager::popBuffer() {
+    if(block_list->size() > 0)
+    {
+        if(inst_buf.size() > 0) 
+        {
+            koopa_raw_basic_block_data_t *last_block = (koopa_raw_basic_block_data_t *)block_list->back();
+            for (size_t i = 0; i < inst_buf.size(); i++) {
+                koopa_raw_value_t inst = (koopa_raw_value_t)inst_buf[i];
+                if (inst->kind.tag == KOOPA_RVT_RETURN ||
+                    inst->kind.tag == KOOPA_RVT_JUMP ||
+                    inst->kind.tag == KOOPA_RVT_BRANCH) 
+                {
+                    inst_buf.resize(i + 1);
+                    break;
+                }
+            }
+            if(!last_block->insts.buffer) {
+                last_block->insts = make_slice(&inst_buf, KOOPA_RSIK_VALUE);
+            }
+            inst_buf.clear();
+        }
+        else {
+            block_list->pop_back();
+        }
+    }
+    return;
+}
+
+void BlockManager::newBlock(koopa_raw_basic_block_data_t *basic_block) {
+    popBuffer();
+    basic_block->insts.buffer = nullptr;
+    basic_block->insts.len = 0;
+    block_list->push_back(basic_block);
+    return;
+}
+
 void SymbolList::addSymbol(std::string symbol, Value value) {
     if(symbol_list_array.empty()) {
         symbol_list_array.push_back(std::map<std::string, Value>());
