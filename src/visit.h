@@ -18,6 +18,8 @@ void Visit(const koopa_raw_return_t &ret, std::ostream &cout);
 void Visit(const koopa_raw_binary_t &binary_op, int dest_addr, std::ostream &cout);
 void Visit(const koopa_raw_load_t &load, int dest_addr, std::ostream &cout);
 void Visit(const koopa_raw_store_t &store, std::ostream &cout);
+void Visit(const koopa_raw_branch_t &branch, std::ostream &cout);
+void Visit(const koopa_raw_jump_t &jump, std::ostream &cout);
 
 void load(const koopa_raw_value_t &value, std::string r, std::ostream &cout);
 
