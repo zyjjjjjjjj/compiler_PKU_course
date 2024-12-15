@@ -135,7 +135,8 @@ void Visit(const koopa_raw_return_t &ret, std::ostream &cout) {
     cout<<"\tadd   t0, t0, sp\n";
     cout<<"\tlw    a0, (t0)\n";
   }
-  cout<<"\taddi sp, sp, "<<cur_size<<"\n";
+  cout<<"\tli    t0, "<<cur_size<<"\n";
+  cout<<"\tadd   sp, sp, t0\n";
   cout<<"\tret\n";
 }
 
