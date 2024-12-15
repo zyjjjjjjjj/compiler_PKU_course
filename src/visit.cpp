@@ -33,7 +33,8 @@ void Visit(const koopa_raw_slice_t &slice, std::ostream &cout) {
 void Visit(const koopa_raw_function_t &func, std::ostream &cout) {
     cout<<"\t.global "<<remove_prefix("@", func->name)<<"\n";
     cout<<remove_prefix("@", func->name)<<":\n";
-    cout<<"\taddi sp, sp, -"<<func_size(func)<<"\n";
+    cout<<"\tli    t0, -"<<func_size(func)<<"\n";
+    cout<<"\tadd   sp, sp, t0\n";
     // 访问所有基本块
     Visit(func->bbs, cout);
 }
@@ -116,7 +117,9 @@ void Visit(const koopa_raw_branch_t &branch, std::ostream &cout) {
     cout<<"\tli    t0, "<<branch.cond->kind.data.integer.value<<"\n";
   }
   else {
-    cout<<"\tlw    t0, "<<get_addr(branch.cond)<<"(sp)\n";
+    cout<<"\tli    t0, "<<get_addr(branch.cond)<<"\n";
+    cout<<"\tadd   t0, t0, sp\n";
+    cout<<"\tlw    t0, (t0)\n";
   }
   cout<<"\tbnez  t0, "<<remove_prefix("%", branch.true_bb->name)<<"\n";
   cout<<"\tj     "<<remove_prefix("%", branch.false_bb->name)<<"\n";
@@ -128,7 +131,9 @@ void Visit(const koopa_raw_return_t &ret, std::ostream &cout) {
     cout<<"\tli    a0, "<<ret.value->kind.data.integer.value<<"\n";
   }
   else {
-    cout<<"\tlw    a0, "<<get_addr(ret.value)<<"(sp)\n";
+    cout<<"\tli    t0, "<<get_addr(ret.value)<<"\n";
+    cout<<"\tadd   t0, t0, sp\n";
+    cout<<"\tlw    a0, (t0)\n";
   }
   cout<<"\taddi sp, sp, "<<cur_size<<"\n";
   cout<<"\tret\n";
@@ -141,16 +146,24 @@ void Visit(const koopa_raw_store_t &store, std::ostream &cout) {
     cout<<"\tli    t0"<<", "<<store.value->kind.data.integer.value<<"\n";
   }
   else {
-    cout<<"\tlw    t0, "<<get_addr(store.value)<<"(sp)\n";
+    cout<<"\tli    t0, "<<get_addr(store.value)<<"\n";
+    cout<<"\tadd   t0, t0, sp\n";
+    cout<<"\tlw    t0, (t0)\n";
   }
-  cout<<"\tsw    t0, "<<get_addr(store.dest)<<"(sp)\n";
+  cout<<"\tli    t1, "<<get_addr(store.dest)<<"\n";
+  cout<<"\tadd   t1, t1, sp\n";
+  cout<<"\tsw    t0, (t1)\n";
 }
 
 //Load指令
 void Visit(const koopa_raw_load_t &load, int dest_addr, std::ostream &cout) {
   // 访问加载指令
-  cout<<"\tlw    t0, "<<get_addr(load.src)<<"(sp)\n";
-  cout<<"\tsw    t0, "<<dest_addr<<"(sp)\n";
+  cout<<"\tli    t0, "<<get_addr(load.src)<<"\n";
+  cout<<"\tadd   t0, t0, sp\n";
+  cout<<"\tlw    t0, (t0)\n";
+  cout<<"\tli    t1, "<<dest_addr<<"\n";
+  cout<<"\tadd   t1, t1, sp\n";
+  cout<<"\tsw    t0, (t1)\n";
 }
 
 // 访问整数常量
@@ -167,14 +180,18 @@ void Visit(const koopa_raw_binary_t &binary_op, int dest_addr, std::ostream &cou
     cout<<"\tli    t0, "<<binary_op.lhs->kind.data.integer.value<<"\n";
   }
   else {
-    cout<<"\tlw    t0, "<<get_addr(binary_op.lhs)<<"(sp)\n";
+    cout<<"\tli    t0, "<<get_addr(binary_op.lhs)<<"\n";
+    cout<<"\tadd   t0, t0, sp\n";
+    cout<<"\tlw    t0, (t0)\n";
   }
 
   if(binary_op.rhs->kind.tag == KOOPA_RVT_INTEGER) {
     cout<<"\tli    t1, "<<binary_op.rhs->kind.data.integer.value<<"\n";
   }
   else {
-    cout<<"\tlw    t1, "<<get_addr(binary_op.rhs)<<"(sp)\n";
+    cout<<"\tli    t1, "<<get_addr(binary_op.rhs)<<"\n";
+    cout<<"\tadd   t1, t1, sp\n";
+    cout<<"\tlw    t1, (t1)\n";
   }
 
   switch (binary_op.op) 
@@ -225,7 +242,9 @@ void Visit(const koopa_raw_binary_t &binary_op, int dest_addr, std::ostream &cou
     default:
       assert(false);
   }
-  cout<<"\tsw    t0, "<<dest_addr<<"(sp)\n";
+  cout<<"\tli    t1, "<<dest_addr<<"\n";
+  cout<<"\tadd   t1, t1, sp\n";
+  cout<<"\tsw    t0, (t1)\n";
 }
 
 void load(const koopa_raw_value_t &value, std::string r, std::ostream &cout) {
