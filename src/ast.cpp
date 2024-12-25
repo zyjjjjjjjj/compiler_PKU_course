@@ -398,6 +398,10 @@ void StmtAST::Dump() const {
     else if(stmt_type == "IF") {
         if_stmt->Dump();
     }
+    else if(stmt_type == "LOOP") {
+        exp->Dump();
+        while_stmt->Dump();
+    }
     std::cout << " }";
 }
 /*
@@ -507,6 +511,47 @@ void *StmtAST::toKoopaIR() const {
         {
             block_manager.newBlock(end_block);
         }
+    }
+    else if(stmt_type == "LOOP") {
+        koopa_raw_basic_block_data_t *while_entry = new koopa_raw_basic_block_data_t;
+        while_entry->name = add_prefix("%", "while_entry");
+        while_entry->params = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        while_entry->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        block_manager.addInst(jumpInst((koopa_raw_basic_block_t)while_entry));
+        block_manager.newBlock(while_entry);
+        koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
+        ir->name = nullptr;
+        ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        ir->ty = make_ty(KOOPA_RTT_UNIT);
+        ir->kind.tag = KOOPA_RVT_BRANCH;
+        ir->kind.data.branch.cond = (koopa_raw_value_t)exp->toKoopaIR();
+        koopa_raw_basic_block_data_t *while_body = new koopa_raw_basic_block_data_t;
+        while_body->name = add_prefix("%", "while_body");
+        while_body->params = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        while_body->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        ir->kind.data.branch.true_bb = (koopa_raw_basic_block_t)while_body;
+        ir->kind.data.branch.true_args = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        koopa_raw_basic_block_data_t *while_end = new koopa_raw_basic_block_data_t;
+        while_end->name = add_prefix("%", "while_end");
+        while_end->params = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        while_end->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        ir->kind.data.branch.false_bb = (koopa_raw_basic_block_t)while_end;
+        ir->kind.data.branch.false_args = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        loop_manager.pushLoop(while_entry, while_end);
+        block_manager.addInst(ir);
+        block_manager.newBlock(while_body);
+        while_stmt->toKoopaIR();
+        block_manager.addInst(jumpInst((koopa_raw_basic_block_t)while_entry));
+        block_manager.newBlock(while_end);
+        loop_manager.popLoop();
+    }
+    else if(stmt_type == "BREAK") {
+        assert(loop_manager.getLoop().loop_end != nullptr);
+        block_manager.addInst(jumpInst(loop_manager.getLoop().loop_end));
+    }
+    else if(stmt_type == "CONTINUE") {
+        assert(loop_manager.getLoop().loop_entry != nullptr);
+        block_manager.addInst(jumpInst(loop_manager.getLoop().loop_entry));
     }
     else if(stmt_type == "EMPTY") {
         return nullptr;

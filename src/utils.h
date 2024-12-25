@@ -6,7 +6,19 @@
 #include <cstring>
 #include <stdio.h>
 
-koopa_raw_value_data *jumpInst(koopa_raw_basic_block_t target);
+struct LoopInfo {
+  koopa_raw_basic_block_data_t *loop_entry;
+  koopa_raw_basic_block_data_t *loop_end;
+};
+
+class LoopManager {
+private:
+  std::vector<LoopInfo> loop_stack;
+public:
+  void pushLoop(koopa_raw_basic_block_data_t *loop_entry, koopa_raw_basic_block_data_t *loop_end);
+  void popLoop();
+  LoopInfo getLoop();
+};
 
 class BlockManager {
 private:
@@ -20,6 +32,8 @@ public:
   bool willBlockReturn();
   void Dump() const;
 };
+
+koopa_raw_value_data *jumpInst(koopa_raw_basic_block_t target);
 
 enum ValueType { Const, Var};
 

@@ -1,5 +1,23 @@
 #include "utils.h"
 
+void LoopManager::pushLoop(koopa_raw_basic_block_data_t *loop_entry, koopa_raw_basic_block_data_t *loop_end) {
+    struct LoopInfo loop_info;
+    loop_info.loop_entry = loop_entry;
+    loop_info.loop_end = loop_end;
+    loop_stack.push_back(loop_info);
+    return;
+}
+
+void LoopManager::popLoop() {
+    assert(!loop_stack.empty());
+    loop_stack.pop_back();
+    return;
+}
+
+LoopInfo LoopManager::getLoop() {
+    return loop_stack.back();
+}
+
 koopa_raw_value_data *jumpInst(koopa_raw_basic_block_t target) {
     koopa_raw_value_data *ir = new koopa_raw_value_data;
     ir->kind.tag = KOOPA_RVT_JUMP;

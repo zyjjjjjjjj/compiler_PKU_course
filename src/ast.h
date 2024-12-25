@@ -9,6 +9,7 @@
 
 static SymbolList symbol_list;
 static BlockManager block_manager;
+static LoopManager loop_manager;
 
 // 基类声明
 class BaseAST {
@@ -164,6 +165,7 @@ class StmtAST : public BaseAST {
   std::unique_ptr<BaseAST> block;
   std::unique_ptr<BaseAST> if_stmt;
   std::unique_ptr<BaseAST> else_stmt;
+  std::unique_ptr<BaseAST> while_stmt;
 
   void Dump() const override;
   //void *toKoopaIR(std::vector<const void *> &stmts) const override;
