@@ -614,8 +614,9 @@ void *LOrExpAST::toKoopaIR(std::vector<const void *> &stmts) const {
 */
 
 void *LOrExpAST::toKoopaIR() const {
-    koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
+    //koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
     if(op == "||") {
+        /*
         ir->name = nullptr;
         ir->ty = make_ty(KOOPA_RTT_INT32);
         ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
@@ -625,6 +626,59 @@ void *LOrExpAST::toKoopaIR() const {
         ir->kind.data.binary.rhs = (koopa_raw_value_t)toBoolKoopaIR(land_exp);
         block_manager.addInst(ir);
         return ir;
+        */
+        koopa_raw_value_data *temp_alloc = new koopa_raw_value_data;
+        temp_alloc->name = add_prefix("@", "temp");
+        temp_alloc->ty = make_pointer_ty(KOOPA_RTT_INT32);
+        temp_alloc->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        temp_alloc->kind.tag = KOOPA_RVT_ALLOC;
+        block_manager.addInst(temp_alloc);
+        koopa_raw_value_data *temp_store = new koopa_raw_value_data;
+        temp_store->name = nullptr;
+        temp_store->ty = make_ty(KOOPA_RTT_INT32);
+        temp_store->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        temp_store->kind.tag = KOOPA_RVT_STORE;
+        temp_store->kind.data.store.dest = (koopa_raw_value_t)temp_alloc;
+        temp_store->kind.data.store.value = (koopa_raw_value_t)NumberAST(1).toKoopaIR();
+        block_manager.addInst(temp_store);
+        koopa_raw_value_data *temp_branch = new koopa_raw_value_data;
+        temp_branch->name = nullptr;
+        temp_branch->ty = make_ty(KOOPA_RTT_UNIT);
+        temp_branch->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        temp_branch->kind.tag = KOOPA_RVT_BRANCH;
+        temp_branch->kind.data.branch.cond = (koopa_raw_value_t)toBoolKoopaIR(lor_exp);
+        koopa_raw_basic_block_data_t *temp_then = new koopa_raw_basic_block_data_t;
+        temp_then->name = add_prefix("%", "then");
+        temp_then->params = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        temp_then->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        temp_branch->kind.data.branch.true_bb = (koopa_raw_basic_block_t)temp_then;
+        temp_branch->kind.data.branch.true_args = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        koopa_raw_basic_block_data_t *temp_end = new koopa_raw_basic_block_data_t;
+        temp_end->name = add_prefix("%", "end");
+        temp_end->params = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        temp_end->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        temp_branch->kind.data.branch.false_bb = (koopa_raw_basic_block_t)temp_end;
+        temp_branch->kind.data.branch.false_args = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        block_manager.addInst(temp_branch);
+        block_manager.newBlock(temp_end);
+        koopa_raw_value_data *temp_store2 = new koopa_raw_value_data;
+        temp_store2->name = nullptr;
+        temp_store2->ty = make_ty(KOOPA_RTT_INT32);
+        temp_store2->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        temp_store2->kind.tag = KOOPA_RVT_STORE;
+        temp_store2->kind.data.store.dest = (koopa_raw_value_t)temp_alloc;
+        temp_store2->kind.data.store.value = (koopa_raw_value_t)toBoolKoopaIR(land_exp);
+        block_manager.addInst(temp_store2);
+        block_manager.addInst(jumpInst((koopa_raw_basic_block_t)temp_then));
+        block_manager.newBlock(temp_then);
+        koopa_raw_value_data *ret = new koopa_raw_value_data;
+        ret->name = nullptr;
+        ret->ty = make_ty(KOOPA_RTT_INT32);
+        ret->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        ret->kind.tag = KOOPA_RVT_LOAD;
+        ret->kind.data.load.src = (koopa_raw_value_t)temp_alloc;
+        block_manager.addInst(ret);
+        return ret;
     }
     else if(op == " ") {
         return land_exp->toKoopaIR();
@@ -706,8 +760,9 @@ void *LAndExpAST::toKoopaIR(std::vector<const void *> &stmts) const {
 */
 
 void *LAndExpAST::toKoopaIR() const {
-    koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
+    //koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
     if(op == "&&") {
+        /*
         ir->name = nullptr;
         ir->ty = make_ty(KOOPA_RTT_INT32);
         ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
@@ -717,6 +772,59 @@ void *LAndExpAST::toKoopaIR() const {
         ir->kind.data.binary.rhs = (koopa_raw_value_t)toBoolKoopaIR(eq_exp);
         block_manager.addInst(ir);
         return ir;
+        */
+        koopa_raw_value_data *temp_alloc = new koopa_raw_value_data;
+        temp_alloc->name = add_prefix("@", "temp");
+        temp_alloc->ty = make_pointer_ty(KOOPA_RTT_INT32);
+        temp_alloc->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        temp_alloc->kind.tag = KOOPA_RVT_ALLOC;
+        block_manager.addInst(temp_alloc);
+        koopa_raw_value_data *temp_store = new koopa_raw_value_data;
+        temp_store->name = nullptr;
+        temp_store->ty = make_ty(KOOPA_RTT_INT32);
+        temp_store->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        temp_store->kind.tag = KOOPA_RVT_STORE;
+        temp_store->kind.data.store.dest = (koopa_raw_value_t)temp_alloc;
+        temp_store->kind.data.store.value = (koopa_raw_value_t)NumberAST(0).toKoopaIR();
+        block_manager.addInst(temp_store);
+        koopa_raw_value_data *temp_branch = new koopa_raw_value_data;
+        temp_branch->name = nullptr;
+        temp_branch->ty = make_ty(KOOPA_RTT_UNIT);
+        temp_branch->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        temp_branch->kind.tag = KOOPA_RVT_BRANCH;
+        temp_branch->kind.data.branch.cond = (koopa_raw_value_t)toBoolKoopaIR(land_exp);
+        koopa_raw_basic_block_data_t *temp_then = new koopa_raw_basic_block_data_t;
+        temp_then->name = add_prefix("%", "then");
+        temp_then->params = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        temp_then->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        temp_branch->kind.data.branch.true_bb = (koopa_raw_basic_block_t)temp_then;
+        temp_branch->kind.data.branch.true_args = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        koopa_raw_basic_block_data_t *temp_end = new koopa_raw_basic_block_data_t;
+        temp_end->name = add_prefix("%", "end");
+        temp_end->params = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        temp_end->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        temp_branch->kind.data.branch.false_bb = (koopa_raw_basic_block_t)temp_end;
+        temp_branch->kind.data.branch.false_args = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        block_manager.addInst(temp_branch);
+        block_manager.newBlock(temp_then);
+        koopa_raw_value_data *temp_store2 = new koopa_raw_value_data;
+        temp_store2->name = nullptr;
+        temp_store2->ty = make_ty(KOOPA_RTT_INT32);
+        temp_store2->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        temp_store2->kind.tag = KOOPA_RVT_STORE;
+        temp_store2->kind.data.store.dest = (koopa_raw_value_t)temp_alloc;
+        temp_store2->kind.data.store.value = (koopa_raw_value_t)toBoolKoopaIR(eq_exp);
+        block_manager.addInst(temp_store2);
+        block_manager.addInst(jumpInst((koopa_raw_basic_block_t)temp_end));
+        block_manager.newBlock(temp_end);
+        koopa_raw_value_data *ret = new koopa_raw_value_data;
+        ret->name = nullptr;
+        ret->ty = make_ty(KOOPA_RTT_INT32);
+        ret->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        ret->kind.tag = KOOPA_RVT_LOAD;
+        ret->kind.data.load.src = (koopa_raw_value_t)temp_alloc;
+        block_manager.addInst(ret);
+        return ret;
     }
     else if(op == " ") {
         return eq_exp->toKoopaIR();
