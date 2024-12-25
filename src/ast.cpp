@@ -42,6 +42,16 @@ void *FuncDefAST::toKoopaIR() const {
     entry->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
     block_manager.newBlock(entry);
     block->toKoopaIR();
+    if(block_manager.willBlockReturn())
+    {
+        koopa_raw_value_data_t *ret = new koopa_raw_value_data_t;
+        ret->name = nullptr;
+        ret->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        ret->ty = make_ty(KOOPA_RTT_UNIT);
+        ret->kind.tag = KOOPA_RVT_RETURN;
+        ret->kind.data.ret.value = (koopa_raw_value_data_t *)NumberAST(0).toKoopaIR();
+        block_manager.addInst(ret);
+    }
     block_manager.popBuffer();
     ir->bbs = make_slice(&blocks, KOOPA_RSIK_BASIC_BLOCK);
     return ir;
