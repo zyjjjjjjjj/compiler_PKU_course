@@ -38,15 +38,15 @@ using namespace std;
 
 // lexer 返回的所有 token 种类的声明
 // 注意 IDENT 和 INT_CONST 会返回 token 的值, 分别对应 str_val 和 int_val
-%token INT RETURN CONST IF ELSE WHILE BREAK CONTINUE
+%token INT VOID RETURN CONST IF ELSE WHILE BREAK CONTINUE
 %token <str_val> IDENT
 %token <int_val> INT_CONST
 
 // 非终结符的类型定义
-%type <ast_val> FuncDef FuncType Block Stmt Exp LOrExp LAndExp EqExp RelExp AddExp MulExp UnaryExp PrimaryExp Number
+%type <ast_val> FuncDef Block Stmt Exp LOrExp LAndExp EqExp RelExp AddExp MulExp UnaryExp PrimaryExp Number
 %type <ast_val> BlockItem Decl ConstDecl VarDecl ConstDef VarDef ConstInitVal InitVal ConstExp LVal BType
-%type <ast_val> If
-%type <ast_vec> ConstDefArray BlockItemArray VarDefArray
+%type <ast_val> If FuncFParam Def
+%type <ast_vec> ConstDefArray BlockItemArray DefArray VarDefArray FuncFParams FuncRParams
 %type <str_val> UnaryOp
 
 %%
@@ -56,13 +56,44 @@ using namespace std;
 // 而 parser 一旦解析完 CompUnit, 就说明所有的 token 都被解析了, 即解析结束了
 // 此时我们应该把 FuncDef 返回的结果收集起来, 作为 AST 传给调用 parser 的函数
 // $1 指代规则里第一个符号的返回值, 也就是 FuncDef 的返回值
+
+
 CompUnit
-  : FuncDef {
+  : DefArray {
     auto comp_unit = make_unique<CompUnitAST>();
-    comp_unit->func_def = unique_ptr<BaseAST>($1);
+    comp_unit->def_array = std::unique_ptr<std::vector<std::unique_ptr<BaseAST>>>($1);
     ast = move(comp_unit);
   }
   ;
+
+DefArray
+  : Def {
+    auto vec = new std::vector<std::unique_ptr<BaseAST>>();
+    auto def = std::unique_ptr<BaseAST>($1);
+    vec->push_back(std::move(def));
+    $$ = vec;
+  }
+  | DefArray Def {
+    auto vec = (std::vector<std::unique_ptr<BaseAST>>*)($1);
+    auto def = std::unique_ptr<BaseAST>($2);
+    vec->push_back(std::move(def));
+    $$ = vec;
+  }
+  ;
+
+Def
+  : FuncDef {
+    auto ast = new DefAST();
+    ast->func_def = unique_ptr<BaseAST>($1);
+    ast->def_type = *new string("FUNC");
+    $$ = ast;
+  }
+  | Decl {
+    auto ast = new DefAST();
+    ast->decl = unique_ptr<BaseAST>($1);
+    ast->def_type = *new string("DECL");
+    $$ = ast;
+  }
 
 // FuncDef ::= FuncType IDENT '(' ')' Block;
 // 我们这里可以直接写 '(' 和 ')', 因为之前在 lexer 里已经处理了单个字符的情况
@@ -75,20 +106,38 @@ CompUnit
 // 虽然此处你看不出用 unique_ptr 和手动 delete 的区别, 但当我们定义了 AST 之后
 // 这种写法会省下很多内存管理的负担
 FuncDef
-  : FuncType IDENT '(' ')' Block {
+  : BType IDENT '(' FuncFParams ')' Block {
     auto ast = new FuncDefAST();
     ast->func_type = unique_ptr<BaseAST>($1);
     ast->ident = *unique_ptr<string>($2);
-    ast->block = unique_ptr<BaseAST>($5);
+    ast->func_fparams = std::unique_ptr<std::vector<std::unique_ptr<BaseAST>>>($4);
+    ast->block = unique_ptr<BaseAST>($6);
     $$ = ast;
   }
   ;
 
-// 同上, 不再解释
-FuncType
-  : INT {
-    auto ast = new FuncTypeAST();
-    ast->func_type = *new string("int");
+FuncFParams
+  : FuncFParam {
+    auto vec = new std::vector<std::unique_ptr<BaseAST>>();
+    auto func_fparam = std::unique_ptr<BaseAST>($1);
+    vec->push_back(std::move(func_fparam));
+    $$ = vec;
+  }
+  | FuncFParams ',' FuncFParam {
+    auto vec = (std::vector<std::unique_ptr<BaseAST>>*)($1);
+    auto func_fparam = std::unique_ptr<BaseAST>($3);
+    vec->push_back(std::move(func_fparam));
+    $$ = vec;
+  }
+  | {
+    $$ = new std::vector<std::unique_ptr<BaseAST>>();
+  }
+
+FuncFParam
+  : BType IDENT {
+    auto ast = new FuncFParamAST();
+    ast->type = unique_ptr<BaseAST>($1);
+    ast->ident = *unique_ptr<string>($2);
     $$ = ast;
   }
   ;
@@ -172,6 +221,11 @@ BType
   : INT {
     auto ast = new BTypeAST();
     ast->type = *new string("INT");
+    $$ = ast;
+  }
+  | VOID {
+    auto ast = new BTypeAST();
+    ast->type = *new string("VOID");
     $$ = ast;
   }
 
@@ -501,6 +555,31 @@ UnaryExp
     ast->unary_op = *($1);
     ast->unary_exp = unique_ptr<BaseAST>($2);
     $$ = ast;
+  }
+  | IDENT '(' FuncRParams ')' {
+    auto ast = new UnaryExpAST();
+    ast->tag = "FCALL";
+    ast->ident = *unique_ptr<string>($1);
+    ast->func_rparams = std::unique_ptr<std::vector<std::unique_ptr<BaseAST>>>($3);
+    $$ = ast;
+  }
+  ;
+
+FuncRParams
+  : Exp {
+    auto vec = new std::vector<std::unique_ptr<BaseAST>>();
+    auto exp = std::unique_ptr<BaseAST>($1);
+    vec->push_back(std::move(exp));
+    $$ = vec;
+  }
+  | FuncRParams ',' Exp {
+    auto vec = (std::vector<std::unique_ptr<BaseAST>>*)($1);
+    auto exp = std::unique_ptr<BaseAST>($3);
+    vec->push_back(std::move(exp));
+    $$ = vec;
+  }
+  | {
+    $$ = new std::vector<std::unique_ptr<BaseAST>>();
   }
   ;
 

@@ -35,19 +35,24 @@ public:
 
 koopa_raw_value_data *jumpInst(koopa_raw_basic_block_t target);
 
-enum ValueType { Const, Var};
+enum ValueType { Const, Var, Func};
 
 struct Value {
   ValueType type;
   union SymbolListValue {
     int const_value;
     koopa_raw_value_t var_value;
+    koopa_raw_function_t func_value;
   } data;
   Value() = default;
   Value(ValueType type, int value) : type(type) { data.const_value = value; }
   Value(ValueType type, koopa_raw_value_t value) : type(type) {
     if (type == Var)
       data.var_value = value;
+  }
+  Value(ValueType type, koopa_raw_function_t value) : type(type) {
+    if (type == Func)
+      data.func_value = value;
   }
 };
 

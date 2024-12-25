@@ -71,7 +71,6 @@ void BlockManager::popBuffer() {
 }
 
 void BlockManager::newBlock(koopa_raw_basic_block_data_t *basic_block) {
-    std::cout<<"new block"<<basic_block->name<<std::endl;
     popBuffer();//创建新block前要将缓冲区中的代码推入前一个block
     basic_block->insts.buffer = nullptr;
     basic_block->insts.len = 0;
@@ -108,6 +107,8 @@ Value SymbolList::getSymbol(std::string symbol) {
             return it->at(symbol);
         }
     }
+    std::cout << "Symbol " << symbol << " not found" << std::endl;
+    Dump();
     assert(false);
 }
 
