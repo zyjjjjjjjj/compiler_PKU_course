@@ -587,7 +587,12 @@ void *VarDefAST::toKoopaIR(koopa_raw_type_t type, std::vector<const void *> &val
         ir->kind.data.global_alloc.init = (koopa_raw_value_t)(var_init_val->toKoopaIR());
     }
     else {
-        ir->kind.data.global_alloc.init = (koopa_raw_value_t)NumberAST(0).toKoopaIR();
+        koopa_raw_value_data_t *zero = new koopa_raw_value_data_t;
+        zero->name = nullptr;
+        zero->ty = make_ty(KOOPA_RTT_INT32);
+        zero->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        zero->kind.tag = KOOPA_RVT_ZERO_INIT;
+        ir->kind.data.global_alloc.init = (koopa_raw_value_t)zero;
     }
     values.push_back(ir);
     symbol_list.addSymbol(ident, Value(ValueType::Var, ir));

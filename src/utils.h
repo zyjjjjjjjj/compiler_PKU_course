@@ -82,3 +82,5 @@ char *add_prefix(const char *prefix, const char *name);
 char *remove_prefix(const char *prefix, const char *name);
 
 void koopa_dump_riscv_to_file(koopa_raw_program_t &program, const char *path);
+
+int round_up(int numToRound, int multiple);

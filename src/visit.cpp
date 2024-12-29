@@ -2,12 +2,16 @@
 
 int cnt = 0;
 int cur_size = 0;
+int funcSize = 0;
+bool func_call = false;
 std::map<koopa_raw_value_t, int> addr_map;
 
 void Visit(const koopa_raw_program_t &program, std::ostream &cout) {
-    cout<<"\t.text\n";
-    Visit(program.values, cout);
-    Visit(program.funcs, cout);
+  std::cout<<"visiting value\n";
+  cout<<"\t.data\n";
+  Visit(program.values, cout);
+  std::cout<<"visiting function\n";
+  Visit(program.funcs, cout);
 }
 
 void Visit(const koopa_raw_slice_t &slice, std::ostream &cout) {
@@ -31,19 +35,40 @@ void Visit(const koopa_raw_slice_t &slice, std::ostream &cout) {
 
 //访问函数
 void Visit(const koopa_raw_function_t &func, std::ostream &cout) {
-    cout<<"\t.global "<<remove_prefix("@", func->name)<<"\n";
-    cout<<remove_prefix("@", func->name)<<":\n";
-    cout<<"\tli    t0, -"<<func_size(func)<<"\n";
+  if(func->bbs.len == 0) {
+    return;
+  }
+  func_call = false;
+  funcSize = func_size(func, func_call);
+  cout<<"\n\t.text\n";
+  cout<<"\t.global "<<remove_prefix("@", func->name)<<"\n";
+  cout<<remove_prefix("@", func->name)<<":\n";
+  if(funcSize != 0 && funcSize >= -2048 && funcSize < 2048)
+    cout<<"\taddi  sp, sp, -"<<funcSize<<"\n";
+  else if(funcSize != 0)
+  {
+    cout<<"\tli    t0, -"<<funcSize<<"\n";
     cout<<"\tadd   sp, sp, t0\n";
-    // 访问所有基本块
-    Visit(func->bbs, cout);
+  }
+  if(func_call) {
+    store_to_stack("ra", funcSize-4, cout);
+  }
+  // 访问所有基本块
+  cur_size = 0;
+  if(func->params.len > 8)
+  {
+    cur_size = 4*(func->params.len-8);
+  }
+  Visit(func->bbs, cout);
 }
 
 // 访问基本块
 void Visit(const koopa_raw_basic_block_t &bb, std::ostream &cout) {
-  if(bb->name != nullptr && std::string(bb->name) != "@entry") {
+  
+  if(bb->name != nullptr && std::string(bb->name) != "%entry") {
     cout<<remove_prefix("%", bb->name)<<":\n";
   }
+  
   // 访问所有指令
   Visit(bb->insts, cout);
 }
@@ -53,7 +78,7 @@ int value_cnt = 0;
 // 访问指令
 void Visit(const koopa_raw_value_t &value, std::ostream &cout) {
   // 根据指令类型判断后续需要如何访问
-  int dest_addr;
+  int dest_addr = -1;
   if(value->ty->tag != KOOPA_RTT_UNIT)
     dest_addr = get_addr(value);
   const auto &kind = value->kind;
@@ -97,10 +122,63 @@ void Visit(const koopa_raw_value_t &value, std::ostream &cout) {
       // 访问 jump 指令
       Visit(kind.data.jump, cout);
       break;
+    case KOOPA_RVT_CALL:
+      // 访问 call 指令
+      Visit(kind.data.call, dest_addr, cout);
+      break;
+    case KOOPA_RVT_GLOBAL_ALLOC:
+      global_var(value, cout);
+      break;
     default:
       // 其他类型暂时遇不到
       std::cout<<kind.tag<<"\n";
       assert(false);
+  }
+}
+
+void global_var(const koopa_raw_value_t &value, std::ostream &cout) {
+  cout<<"\t.global "<<remove_prefix("@", value->name)<<"\n";
+  cout<<remove_prefix("@", value->name)<<":\n";
+  if(value->kind.data.global_alloc.init->kind.tag == KOOPA_RVT_INTEGER) {
+    cout<<"\t.word "<<value->kind.data.global_alloc.init->kind.data.integer.value<<"\n";
+  }
+  else if(value->kind.data.global_alloc.init->kind.tag == KOOPA_RVT_ZERO_INIT)
+  {
+    cout<<"\t.zero "<<type_size(value->ty->data.pointer.base)<<"\n";
+  }
+}
+
+// 访问函数调用指令
+void Visit(const koopa_raw_call_t &call, int dest_addr, std::ostream &cout) {
+  // 访问函数调用指令
+
+  // 保存前8个参数
+  for (size_t i = 0; i < call.args.len && i < 8; ++i) {
+    auto ptr = reinterpret_cast<koopa_raw_value_t>(call.args.buffer[i]);
+    if(ptr->kind.tag == KOOPA_RVT_INTEGER) {
+      cout<<"\tli    a"<<i<<", "<<ptr->kind.data.integer.value<<"\n";
+    }
+    else {
+      load_from_stack("a"+std::to_string(i), get_addr(ptr), cout);
+    }
+  }
+  // 保存剩余参数
+  bool callee_call = false;
+  int callee_size = func_size(call.callee, callee_call);
+  for(int i = 8; i < call.args.len; ++i) {
+    auto ptr = reinterpret_cast<koopa_raw_value_t>(call.args.buffer[i]);
+    if(ptr->kind.tag == KOOPA_RVT_INTEGER) {
+      cout<<"\tli    t0, "<<ptr->kind.data.integer.value<<"\n";
+    }
+    else {
+      load_from_stack("t0", get_addr(ptr), cout);
+    }
+    store_to_stack("t0", (i-8)*4 - callee_size, cout);
+  }
+
+  cout<<"\tcall  "<<remove_prefix("@", call.callee->name)<<"\n";
+  if(dest_addr != -1) {
+    store_to_stack("a0", dest_addr, cout);
   }
 }
 
@@ -117,9 +195,7 @@ void Visit(const koopa_raw_branch_t &branch, std::ostream &cout) {
     cout<<"\tli    t0, "<<branch.cond->kind.data.integer.value<<"\n";
   }
   else {
-    cout<<"\tli    t0, "<<get_addr(branch.cond)<<"\n";
-    cout<<"\tadd   t0, t0, sp\n";
-    cout<<"\tlw    t0, (t0)\n";
+    load_from_stack("t0", get_addr(branch.cond), cout);
   }
   cout<<"\tbnez  t0, "<<remove_prefix("%", branch.true_bb->name)<<"\n";
   cout<<"\tj     "<<remove_prefix("%", branch.false_bb->name)<<"\n";
@@ -127,44 +203,69 @@ void Visit(const koopa_raw_branch_t &branch, std::ostream &cout) {
 
 // 访问返回指令
 void Visit(const koopa_raw_return_t &ret, std::ostream &cout) {
-  if(ret.value->kind.tag == KOOPA_RVT_INTEGER) {
-    cout<<"\tli    a0, "<<ret.value->kind.data.integer.value<<"\n";
+  if(ret.value != nullptr) {
+    if(ret.value->kind.tag == KOOPA_RVT_INTEGER) {
+      cout<<"\tli    a0, "<<ret.value->kind.data.integer.value<<"\n";
+    }
+    else {
+      load_from_stack("a0", get_addr(ret.value), cout);
+    }
   }
-  else {
-    cout<<"\tli    t0, "<<get_addr(ret.value)<<"\n";
-    cout<<"\tadd   t0, t0, sp\n";
-    cout<<"\tlw    a0, (t0)\n";
+  if(func_call) {
+    load_from_stack("ra", funcSize-4, cout);
   }
-  cout<<"\tli    t0, "<<cur_size<<"\n";
-  cout<<"\tadd   sp, sp, t0\n";
+  if(funcSize != 0 && funcSize >= -2048 && funcSize < 2048)
+    cout<<"\taddi  sp, sp, "<<funcSize<<"\n";
+  else if(funcSize != 0)
+  {
+    cout<<"\tli    t0, "<<funcSize<<"\n";
+    cout<<"\tadd   sp, sp, t0\n";
+  }
   cout<<"\tret\n";
 }
 
 //Store指令
 void Visit(const koopa_raw_store_t &store, std::ostream &cout) {
-  // 访问存储指令
-  if(store.value->kind.tag == KOOPA_RVT_INTEGER) {
-    cout<<"\tli    t0"<<", "<<store.value->kind.data.integer.value<<"\n";
+  // 加载参数
+  if(store.value->kind.tag == KOOPA_RVT_FUNC_ARG_REF)
+  {
+    if(store.value->kind.data.func_arg_ref.index < 8) {
+      store_to_stack("a"+std::to_string(store.value->kind.data.func_arg_ref.index), get_addr(store.dest), cout);
+    }
+    else {
+      load_from_stack("t0", (store.value->kind.data.func_arg_ref.index - 8) * 4, cout);
+      store_to_stack("t0", get_addr(store.dest), cout);
+    }
   }
-  else {
-    cout<<"\tli    t0, "<<get_addr(store.value)<<"\n";
-    cout<<"\tadd   t0, t0, sp\n";
-    cout<<"\tlw    t0, (t0)\n";
+  else//非参数
+  {
+    //加载source
+    if(store.value->kind.tag == KOOPA_RVT_INTEGER) {
+      cout<<"\tli    t0"<<", "<<store.value->kind.data.integer.value<<"\n";
+    }
+    else {
+      load_from_stack("t0", get_addr(store.value), cout);
+    }
+    //加载dest
+    if(store.dest->kind.tag == KOOPA_RVT_GLOBAL_ALLOC) {
+      cout<<"\tla    t1, "<<remove_prefix("@", store.dest->name)<<"\n";
+      cout<<"\tsw    t0, 0(t1)\n";
+    }
+    else
+      store_to_stack("t0", get_addr(store.dest), cout);
   }
-  cout<<"\tli    t1, "<<get_addr(store.dest)<<"\n";
-  cout<<"\tadd   t1, t1, sp\n";
-  cout<<"\tsw    t0, (t1)\n";
 }
 
 //Load指令
 void Visit(const koopa_raw_load_t &load, int dest_addr, std::ostream &cout) {
   // 访问加载指令
-  cout<<"\tli    t0, "<<get_addr(load.src)<<"\n";
-  cout<<"\tadd   t0, t0, sp\n";
-  cout<<"\tlw    t0, (t0)\n";
-  cout<<"\tli    t1, "<<dest_addr<<"\n";
-  cout<<"\tadd   t1, t1, sp\n";
-  cout<<"\tsw    t0, (t1)\n";
+  if(load.src->kind.tag == KOOPA_RVT_GLOBAL_ALLOC) {
+    cout<<"\tla    t0, "<<remove_prefix("@", load.src->name)<<"\n";
+    cout<<"\tlw    t0, 0(t0)\n";
+  }
+  else
+    load_from_stack("t0", get_addr(load.src), cout);
+  store_to_stack("t0", dest_addr, cout);
 }
 
 // 访问整数常量
@@ -181,18 +282,14 @@ void Visit(const koopa_raw_binary_t &binary_op, int dest_addr, std::ostream &cou
     cout<<"\tli    t0, "<<binary_op.lhs->kind.data.integer.value<<"\n";
   }
   else {
-    cout<<"\tli    t0, "<<get_addr(binary_op.lhs)<<"\n";
-    cout<<"\tadd   t0, t0, sp\n";
-    cout<<"\tlw    t0, (t0)\n";
+    load_from_stack("t0", get_addr(binary_op.lhs), cout);
   }
 
   if(binary_op.rhs->kind.tag == KOOPA_RVT_INTEGER) {
     cout<<"\tli    t1, "<<binary_op.rhs->kind.data.integer.value<<"\n";
   }
   else {
-    cout<<"\tli    t1, "<<get_addr(binary_op.rhs)<<"\n";
-    cout<<"\tadd   t1, t1, sp\n";
-    cout<<"\tlw    t1, (t1)\n";
+    load_from_stack("t1", get_addr(binary_op.rhs), cout);
   }
 
   switch (binary_op.op) 
@@ -243,9 +340,7 @@ void Visit(const koopa_raw_binary_t &binary_op, int dest_addr, std::ostream &cou
     default:
       assert(false);
   }
-  cout<<"\tli    t1, "<<dest_addr<<"\n";
-  cout<<"\tadd   t1, t1, sp\n";
-  cout<<"\tsw    t0, (t1)\n";
+  store_to_stack("t0", dest_addr, cout);
 }
 
 void load(const koopa_raw_value_t &value, std::string r, std::ostream &cout) {
@@ -253,28 +348,55 @@ void load(const koopa_raw_value_t &value, std::string r, std::ostream &cout) {
   Visit(value, cout);
 }
 
-int func_size(const koopa_raw_function_t &func) {
+int func_size(const koopa_raw_function_t &func, bool &call) {
   int size = 0;
+  int arg_count = 0;
   for (size_t i = 0; i < func->bbs.len; ++i) {
     auto ptr = func->bbs.buffer[i];
-    size += bb_size(reinterpret_cast<koopa_raw_basic_block_t>(ptr));
+    size += bb_size(reinterpret_cast<koopa_raw_basic_block_t>(ptr), call, arg_count);
   }
-  return size;
+  if(call) {
+    size += 4;
+  }
+  if(arg_count > 8) {
+    size += 4 * (arg_count - 8);
+  }
+  if(func->params.len > 8) {
+    size += 4 * (func->params.len - 8);
+  }
+  return round_up(size, 16);
 }
 
-int bb_size(const koopa_raw_basic_block_t &bb) {
+int bb_size(const koopa_raw_basic_block_t &bb, bool &call, int &arg_count) {
   int size = 0;
   for (size_t i = 0; i < bb->insts.len; ++i) {
     auto ptr = bb->insts.buffer[i];
-    size += inst_size(reinterpret_cast<koopa_raw_value_t>(ptr));
+    size += inst_size(reinterpret_cast<koopa_raw_value_t>(ptr), call, arg_count);
   }
   return size;
 }
 
-int inst_size(const koopa_raw_value_t &inst) {
-  if (inst->ty->tag != KOOPA_RTT_UNIT)
-    return 4;
-  return 0;
+int inst_size(const koopa_raw_value_t &inst, bool &call, int &arg_count) {
+  if(inst->kind.tag == KOOPA_RVT_CALL) {
+    call = true;
+    if(arg_count < inst->kind.data.call.args.len) {
+      arg_count = inst->kind.data.call.args.len;
+    }
+  }
+  if(inst->kind.tag == KOOPA_RVT_ALLOC)
+    return type_size(inst->ty->data.pointer.base);
+  return type_size(inst->ty);
+}
+
+int type_size(const koopa_raw_type_t &ty) {
+  switch(ty->tag) {
+    case KOOPA_RTT_INT32:
+      return 4;
+    case KOOPA_RTT_UNIT:
+      return 0;
+    default:
+      assert(false);
+  }
 }
 
 int get_addr(const koopa_raw_value_t &value) {
@@ -283,4 +405,24 @@ int get_addr(const koopa_raw_value_t &value) {
     cur_size += 4;
   }
   return addr_map[value];
+}
+
+void store_to_stack(std::string reg, int addr, std::ostream &cout) {
+  if(addr >= -2048 && addr < 2048)
+    cout<<"\tsw    "<<reg<<", "<<addr<<"(sp)\n";
+  else {
+    cout<<"\tli    t3, "<<addr<<"\n";
+    cout<<"\tadd   t3, t3, sp\n";
+    cout<<"\tsw    "<<reg<<", (t3)\n";
+  }
+}
+
+void load_from_stack(std::string reg, int addr, std::ostream &cout) {
+  if(addr >= -2048 && addr < 2048)
+    cout<<"\tlw    "<<reg<<", "<<addr<<"(sp)\n";
+  else {
+    cout<<"\tli    t3, "<<addr<<"\n";
+    cout<<"\tadd   t3, t3, sp\n";
+    cout<<"\tlw    "<<reg<<", (t3)\n";
+  }
 }

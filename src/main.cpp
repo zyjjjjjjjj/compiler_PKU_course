@@ -58,13 +58,17 @@ int main(int argc, const char *argv[]) {
   else if(std::string(mode) == "-riscv") {
     size_t len = 1000000u;
     char *buf = new char[len];
+    std::cout<<"dumping to string...\n";
     koopa_dump_to_string(inter_program, buf, &len);
     koopa_delete_program(inter_program);
+    std::cout<<"parsing from string...\n";
     koopa_parse_from_string(buf, &program);
     koopa_raw_program_builder_t raw_builder= koopa_new_raw_program_builder();
+    std::cout<<"building raw program...\n";
     koopa_raw_program_t Raw_Program = koopa_build_raw_program(raw_builder, program);
     koopa_delete_program(program);
     std::ofstream file(output);
+    std::cout<<"visiting...\n";
     if (file.is_open()) {
       Visit(Raw_Program, file);
       file.close();

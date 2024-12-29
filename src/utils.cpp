@@ -183,6 +183,10 @@ char *remove_prefix(const char *prefix, const char *name) {
     return strdup(name);
 }
 
+int round_up(int num, int multiple) {
+    return ((num + multiple - 1) / multiple) * multiple;
+}
+
 void koopa_dump_riscv_to_file(koopa_raw_program_t &raw_program, const char *path) {
     FILE* original_stdout = stdout;
     freopen(path, "w", stdout);
