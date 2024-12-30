@@ -244,6 +244,10 @@ void *FuncDefAST::toKoopaIR() const {
     }
     symbol_list.deleteScope();
     block_manager.popBuffer();
+    for(int i=0;i<blocks.size();i++) {
+        koopa_raw_basic_block_data_t *bb = (koopa_raw_basic_block_data_t *)blocks[i];
+        bb->name = add_prefix(add_prefix("%", ident.c_str()), add_prefix("_", remove_prefix("%", bb->name)));
+    }
     ir->bbs = make_slice(&blocks, KOOPA_RSIK_BASIC_BLOCK);
     return ir;
 
