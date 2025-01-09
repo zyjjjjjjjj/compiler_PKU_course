@@ -937,6 +937,7 @@ void *VarDefAST::toKoopaIR(koopa_raw_type_t type, std::vector<const void *> &val
             {
                 std::vector<const void *> init_val_vec;
                 init_val->restructure(dim_size, init_val_vec);
+                std::cout<<std::endl<<total_size<<' '<<init_val_vec.size()<<std::endl;
                 assert(total_size == init_val_vec.size());
                 ir->kind.data.global_alloc.init = (koopa_raw_value_t)init_val->toKoopaIR(init_val_vec, dim_size);
             }
@@ -1053,11 +1054,13 @@ void InitValAST::restructure(std::vector<int> dim_size, std::vector<const void *
             else
             {
                 int cur_size = init_val_vec.size();
+                assert(len_n!=0);
                 assert(cur_size % len_n == 0);
                 int align_size = cur_size / len_n;
                 int dim_count = 1;
-                for(int i = dim_size.size() - 2; i >= 1; i++)
+                for(int i = dim_size.size() - 2; i >= 1; i--)
                 {
+                    assert(dim_size[i]!=0);
                     if(align_size % dim_size[i] != 0)
                         break;
                     dim_count++;
@@ -1072,6 +1075,7 @@ void InitValAST::restructure(std::vector<int> dim_size, std::vector<const void *
             }
         }
     }   
+    assert(total_size != 0);
     while(init_val_vec.size() % total_size != 0)
     {
         init_val_vec.push_back(NumberAST(0).toKoopaIR());
