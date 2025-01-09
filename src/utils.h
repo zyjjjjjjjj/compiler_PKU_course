@@ -35,7 +35,7 @@ public:
 
 koopa_raw_value_data *jumpInst(koopa_raw_basic_block_t target);
 
-enum ValueType { Const, Var, Func};
+enum ValueType { Const, Var, Func, Array, Pointer};
 
 struct Value {
   ValueType type;
@@ -43,12 +43,18 @@ struct Value {
     int const_value;
     koopa_raw_value_t var_value;
     koopa_raw_function_t func_value;
+    koopa_raw_value_t array_value;
+    koopa_raw_value_t pointer_value;
   } data;
   Value() = default;
   Value(ValueType type, int value) : type(type) { data.const_value = value; }
   Value(ValueType type, koopa_raw_value_t value) : type(type) {
     if (type == Var)
       data.var_value = value;
+    else if (type == Array)
+      data.array_value = value;
+    else if(type == Pointer)
+      data.pointer_value = value;
   }
   Value(ValueType type, koopa_raw_function_t value) : type(type) {
     if (type == Func)
@@ -75,7 +81,11 @@ koopa_raw_type_kind_t *make_func_ty(std::vector<const void *> *buf, const koopa_
 
 koopa_raw_type_kind_t *make_ty(koopa_raw_type_tag_t tag);
 
+koopa_raw_type_kind_t *make_array_ty(koopa_raw_type_tag_t tag, std::vector<int> dim_size);
+
 koopa_raw_type_kind_t *make_pointer_ty(koopa_raw_type_tag_t tag);
+
+koopa_raw_type_kind_t *make_array_pointer_ty(koopa_raw_type_tag_t tag, std::vector<int> dim_sizes);
 
 char *add_prefix(const char *prefix, const char *name);
 

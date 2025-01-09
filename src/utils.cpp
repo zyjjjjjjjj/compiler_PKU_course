@@ -162,10 +162,29 @@ koopa_raw_type_kind_t *make_ty(koopa_raw_type_tag_t tag) {
     return ty;
 }
 
+koopa_raw_type_kind_t *make_array_ty(koopa_raw_type_tag_t tag, std::vector<int> dim_size) {
+    koopa_raw_type_kind_t *last_dim = make_ty(tag);
+    for(int i=dim_size.size()-1; i>=0; i--) {
+        koopa_raw_type_kind_t *ty = new koopa_raw_type_kind_t;
+        ty->tag = KOOPA_RTT_ARRAY;
+        ty->data.array.len = dim_size[i];
+        ty->data.array.base = last_dim;
+        last_dim = ty;
+    }
+    return last_dim;
+}
+
 koopa_raw_type_kind_t *make_pointer_ty(koopa_raw_type_tag_t tag) {
     koopa_raw_type_kind_t *ty = new koopa_raw_type_kind_t;
     ty->tag = KOOPA_RTT_POINTER;
     ty->data.pointer.base = make_ty(tag);
+    return ty;
+}
+
+koopa_raw_type_kind_t *make_array_pointer_ty(koopa_raw_type_tag_t tag, std::vector<int> dim_sizes) {
+    koopa_raw_type_kind_t *ty = new koopa_raw_type_kind_t;
+    ty->tag = KOOPA_RTT_POINTER;
+    ty->data.pointer.base = make_array_ty(tag, dim_sizes);
     return ty;
 }
 

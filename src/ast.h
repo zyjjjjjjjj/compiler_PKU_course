@@ -24,6 +24,7 @@ class BaseAST {
   virtual void *toKoopaIR(int i) const { return nullptr; };
   virtual void *toKoopaIR(std::vector<const void *> &functions, std::vector<const void *> &values) const { return nullptr; };
   virtual void *toKoopaIR(koopa_raw_type_t type, std::vector<const void *> &values) const { return nullptr; };
+  virtual void *toKoopaIR(std::vector<const void *> &init_val_vec, std::vector<int> dim_size) const { return nullptr; };
   virtual int calculate() const { return 0; };
   virtual void *getKoopaIR() const { return nullptr; };
 };
@@ -73,8 +74,11 @@ class FuncFParamAST : public BaseAST {
  public:
   std::unique_ptr<BaseAST> type;
   std::string ident;
+  bool is_array;
+  std::unique_ptr<std::vector<std::unique_ptr<BaseAST>>> array;
 
   void Dump() const override;
+  void *toKoopaIR() const override;
   void *toKoopaIR(int i) const override;
 };
 
@@ -120,6 +124,7 @@ class ConstDeclAST : public BaseAST {
   void Dump() const override;
   //void *toKoopaIR(std::vector<const void *> &stmts) const override;
   void *toKoopaIR() const override;
+  void *toKoopaIR(std::vector<const void *> &values) const override;
 };
 
 class VarDeclAST : public BaseAST {
@@ -144,16 +149,19 @@ class BTypeAST : public BaseAST {
 class ConstDefAST : public BaseAST {
  public:
   std::string ident;
+  std::unique_ptr<std::vector<std::unique_ptr<BaseAST>>> array;
   std::unique_ptr<BaseAST> const_init_val;
 
   void Dump() const override;
   //void *toKoopaIR(std::vector<const void *> &stmts) const override;
-  void *toKoopaIR() const override;
+  void *toKoopaIR(koopa_raw_type_t type) const override;
+  void *toKoopaIR(koopa_raw_type_t type, std::vector<const void *> &values) const override;
 };
 
 class VarDefAST : public BaseAST {
  public:
   std::string ident;
+  std::unique_ptr<std::vector<std::unique_ptr<BaseAST>>> array;
   std::unique_ptr<BaseAST> var_init_val;
 
   void Dump() const override;
@@ -176,11 +184,15 @@ class ConstInitValAST : public BaseAST {
 class InitValAST : public BaseAST {
  public:
   std::unique_ptr<BaseAST> exp;
+  std::unique_ptr<std::vector<std::unique_ptr<BaseAST>>> init_val_array;
+  enum { EXP, ARRAY, ZERO } type;
 
   void Dump() const override;
   //void *toKoopaIR(std::vector<const void *> &stmts) const override;
   void *toKoopaIR() const override;
+  void *toKoopaIR(std::vector<const void *> &init_val_vec, std::vector<int> dim_size) const override;
   int calculate() const override;
+  void restructure(std::vector<int> dim_size, std::vector<const void *> &init_val_vec) const;
 };
 
 // StmtAST 派生类
@@ -349,6 +361,7 @@ class NumberAST : public BaseAST {
 class LValAST : public BaseAST {
  public:
   std::string ident;
+  std::unique_ptr<std::vector<std::unique_ptr<BaseAST>>> array;
 
   void Dump() const override;
   //void *toKoopaIR(std::vector<const void *> &stmts) const override;

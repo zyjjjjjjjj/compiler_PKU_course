@@ -46,7 +46,7 @@ using namespace std;
 %type <ast_val> FuncDef Block Stmt Exp LOrExp LAndExp EqExp RelExp AddExp MulExp UnaryExp PrimaryExp Number
 %type <ast_val> BlockItem Decl ConstDecl VarDecl ConstDef VarDef ConstInitVal InitVal ConstExp LVal BType
 %type <ast_val> If FuncFParam Def
-%type <ast_vec> ConstDefArray BlockItemArray DefArray VarDefArray FuncFParams FuncRParams
+%type <ast_vec> ConstDefArray BlockItemArray DefArray VarDefArray FuncFParams FuncRParams Array InitValArray
 %type <str_val> UnaryOp
 
 %%
@@ -138,6 +138,24 @@ FuncFParam
     auto ast = new FuncFParamAST();
     ast->type = unique_ptr<BaseAST>($1);
     ast->ident = *unique_ptr<string>($2);
+    ast->array = nullptr;
+    ast->is_array = false;
+    $$ = ast;
+  }
+  | BType IDENT '[' ']' {
+    auto ast = new FuncFParamAST();
+    ast->type = unique_ptr<BaseAST>($1);
+    ast->ident = *unique_ptr<string>($2);
+    ast->array = nullptr;
+    ast->is_array = true;
+    $$ = ast;
+  }
+  | BType IDENT '[' ']' Array {
+    auto ast = new FuncFParamAST();
+    ast->type = unique_ptr<BaseAST>($1);
+    ast->ident = *unique_ptr<string>($2);
+    ast->array = std::unique_ptr<std::vector<std::unique_ptr<BaseAST>>>($5);
+    ast->is_array = true;
     $$ = ast;
   }
   ;
@@ -263,8 +281,31 @@ ConstDef
   : IDENT '=' ConstInitVal {
     auto ast = new ConstDefAST();
     ast->ident = *unique_ptr<string>($1);
+    ast->array = nullptr;
     ast->const_init_val = unique_ptr<BaseAST>($3);
     $$ = ast;
+  }
+  | IDENT Array '=' InitVal {
+    auto ast = new ConstDefAST();
+    ast->ident = *unique_ptr<string>($1);
+    ast->array = std::unique_ptr<std::vector<std::unique_ptr<BaseAST>>>($2);
+    ast->const_init_val = unique_ptr<BaseAST>($4);
+    $$ = ast;
+  }
+  ;
+
+Array
+  : '[' Exp ']' {
+    auto *vec = new std::vector<std::unique_ptr<BaseAST>>();
+    auto exp = unique_ptr<BaseAST>($2);
+    vec->push_back(std::move(exp));
+    $$ = vec;
+  }
+  | Array '[' Exp ']' {
+    auto vec = (std::vector<std::unique_ptr<BaseAST>> *)($1);
+    auto exp = unique_ptr<BaseAST>($3);
+    vec->push_back(std::move(exp));
+    $$ = vec;
   }
   ;
 
@@ -281,6 +322,20 @@ VarDef
     ast->var_init_val = unique_ptr<BaseAST>($3);
     $$ = ast;
   }
+  | IDENT Array '=' InitVal {
+    auto ast = new VarDefAST();
+    ast->ident = *unique_ptr<string>($1);
+    ast->array = std::unique_ptr<std::vector<std::unique_ptr<BaseAST>>>($2);
+    ast->var_init_val = std::unique_ptr<BaseAST>($4);
+    $$ = ast;
+  }
+  | IDENT Array {
+    auto ast = new VarDefAST();
+    ast->ident = *unique_ptr<string>($1);
+    ast->array = std::unique_ptr<std::vector<std::unique_ptr<BaseAST>>>($2);
+    ast->var_init_val = nullptr;
+    $$ = ast;
+  }
   ;
 
 ConstInitVal
@@ -290,12 +345,40 @@ ConstInitVal
     $$ = ast;
   }
 
+InitValArray
+  : InitVal {
+    auto vec = new std::vector<std::unique_ptr<BaseAST>>();
+    auto init_val = std::unique_ptr<BaseAST>($1);
+    vec->push_back(std::move(init_val));
+    $$ = vec;
+  }
+  | InitValArray ',' InitVal {
+    auto vec = (std::vector<std::unique_ptr<BaseAST>> *)($1);
+    auto init_val = std::unique_ptr<BaseAST>($3);
+    vec->push_back(std::move(init_val));
+    $$ = vec;
+  }
+  ;
+
 InitVal
-  : Exp {
+  : '{' InitValArray '}' {
     auto ast = new InitValAST();
-    ast->exp = unique_ptr<BaseAST>($1);
+    ast->init_val_array = std::unique_ptr<std::vector<std::unique_ptr<BaseAST>>>($2);
+    ast->type = InitValAST::ARRAY;
     $$ = ast;
   }
+  | '{' '}' {
+    auto ast = new InitValAST();
+    ast->type = InitValAST::ZERO;
+    $$ = ast;
+  }
+  |  Exp {
+    auto ast = new InitValAST();
+    ast->exp = unique_ptr<BaseAST>($1);
+    ast->type = InitValAST::EXP;
+    $$ = ast;
+  }
+  ;
 
 Stmt
   : RETURN Exp ';' {
@@ -390,12 +473,16 @@ Exp
     ast->lor_exp = unique_ptr<BaseAST>($1);
     $$ = ast;
   }
+  ;
+
+  /*
   | '{' Exp '}' {
     auto ast = new ExpAST();
     ast->lor_exp = unique_ptr<BaseAST>($2);
     $$ = ast;
   }
   ;
+  */
 
 LOrExp
   : LAndExp {
@@ -628,6 +715,13 @@ LVal
   : IDENT {
     auto ast = new LValAST();
     ast->ident = *unique_ptr<string>($1);
+    ast->array = nullptr;
+    $$ = ast;
+  }
+  | IDENT Array {
+    auto ast = new LValAST();
+    ast->ident = *unique_ptr<string>($1);
+    ast->array = std::unique_ptr<std::vector<std::unique_ptr<BaseAST>>>($2);
     $$ = ast;
   }
   ;

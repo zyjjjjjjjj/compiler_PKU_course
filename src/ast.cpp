@@ -42,7 +42,7 @@ void CompUnitAST::DeclineLibFunc(std::vector<const void *> &functions) const{
     func = new koopa_raw_function_data_t;
     func->name = add_prefix("@", "getarray");
     params.push_back(make_pointer_ty(KOOPA_RTT_INT32));
-    func->ty = make_func_ty(&params, make_ty(KOOPA_RTT_UNIT));
+    func->ty = make_func_ty(&params, make_ty(KOOPA_RTT_INT32));
     func->params = make_slice(nullptr, KOOPA_RSIK_VALUE);
     func->bbs = make_slice(nullptr, KOOPA_RSIK_BASIC_BLOCK);
     symbol_list.addSymbol("getarray", Value(ValueType::Func, func));
@@ -182,7 +182,7 @@ void *FuncDefAST::toKoopaIR() const {
     ir->name = add_prefix("@", ident.c_str());
     std::vector<const void *> params_type;
     for(auto &param : *func_fparams) {
-        params_type.push_back(static_cast<FuncFParamAST*>(param.get())->type->toKoopaIR());
+        params_type.push_back(static_cast<FuncFParamAST*>(param.get())->toKoopaIR());
     }
     if(params_type.size() > 0) {
         ir->ty = make_func_ty(&params_type, (const koopa_raw_type_kind *)func_type->toKoopaIR());
@@ -213,9 +213,18 @@ void *FuncDefAST::toKoopaIR() const {
         koopa_raw_value_data_t *alloc_local = new koopa_raw_value_data_t;
         alloc_local->name = ((koopa_raw_value_t)params[i])->name;
         alloc_local->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-        alloc_local->ty = make_pointer_ty(KOOPA_RTT_INT32);
+        //alloc_local->ty = make_pointer_ty(KOOPA_RTT_INT32);
+        koopa_raw_type_kind *ty = new koopa_raw_type_kind();
+        ty->tag = KOOPA_RTT_POINTER;
+        ty->data.pointer.base = ((koopa_raw_value_t)params[i])->ty;
+        alloc_local->ty = ty;
         alloc_local->kind.tag = KOOPA_RVT_ALLOC;
-        symbol_list.addSymbol(std::string(remove_prefix("@", alloc_local->name)), Value(ValueType::Var, alloc_local));
+        if(ty->data.pointer.base->tag == KOOPA_RTT_INT32) {
+            symbol_list.addSymbol(std::string(remove_prefix("@", alloc_local->name)), Value(ValueType::Var, alloc_local));
+        }
+        else {
+            symbol_list.addSymbol(std::string(remove_prefix("@", alloc_local->name)), Value(ValueType::Pointer, alloc_local));
+        }
         block_manager.addInst(alloc_local);
         koopa_raw_value_data_t *store_local = new koopa_raw_value_data_t;
         store_local->name = nullptr;
@@ -275,11 +284,38 @@ void FuncFParamAST::Dump() const {
     std::cout << ", " << ident << " }";
 }
 
+void *FuncFParamAST::toKoopaIR() const {//return type
+    if(!is_array)
+    {
+        return type->toKoopaIR();
+    }
+    else
+    {
+        koopa_raw_type_kind *ty = new koopa_raw_type_kind();
+
+        if(array==nullptr)
+        {
+            ty = make_pointer_ty(KOOPA_RTT_INT32);
+        }
+        else
+        {
+            std::vector<int> dim_size;
+            for(auto &dim : *array)
+            {
+                dim_size.push_back(dim->calculate());
+            }
+            ty = make_array_pointer_ty(KOOPA_RTT_INT32, dim_size);
+        }
+        return ty;
+    }
+}
+
 void *FuncFParamAST::toKoopaIR(int i) const {
     koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
     ir->name = add_prefix("@", ident.c_str());
     ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-    ir->ty = (koopa_raw_type_t)type->toKoopaIR();
+    //ir->ty = (koopa_raw_type_t)type->toKoopaIR();
+    ir->ty = (koopa_raw_type_t)toKoopaIR();
     ir->kind.tag = KOOPA_RVT_FUNC_ARG_REF;
     ir->kind.data.func_arg_ref.index = i;
     return ir;
@@ -418,7 +454,7 @@ void *DeclAST::toKoopaIR() const {
 
 void *DeclAST::toKoopaIR(std::vector<const void *> &values) const {
     if(decl_type == "CONST") {
-        return const_decl->toKoopaIR();
+        return const_decl->toKoopaIR(values);
     }
     else if(decl_type == "VAR") {
         return var_decl->toKoopaIR(values);
@@ -444,8 +480,17 @@ void *ConstDeclAST::toKoopaIR(std::vector<const void *> &stmts) const {
 */
 
 void *ConstDeclAST::toKoopaIR() const {
+    koopa_raw_type_t const_type = (const koopa_raw_type_t)type->toKoopaIR();
     for(auto &const_def : *const_def_array) {
-        const_def->toKoopaIR();
+        const_def->toKoopaIR(const_type);
+    }
+    return nullptr;
+}
+
+void *ConstDeclAST::toKoopaIR(std::vector<const void *> &values) const {
+    koopa_raw_type_t const_type = (const koopa_raw_type_t)type->toKoopaIR();
+    for(auto &const_def : *const_def_array) {
+        const_def->toKoopaIR(const_type, values);
     }
     return nullptr;
 }
@@ -519,11 +564,151 @@ void *ConstDefAST::toKoopaIR(std::vector<const void *> &stmts) const {
 }
 */
 
-void *ConstDefAST::toKoopaIR() const {
-    int val = const_init_val->calculate();
-    Value value(ValueType::Const, val);
-    symbol_list.addSymbol(ident, value);
-    return nullptr;
+void *ConstDefAST::toKoopaIR(koopa_raw_type_t type) const {
+    if(array==nullptr)
+    {
+        int val = const_init_val->calculate();
+        Value value(ValueType::Const, val);
+        symbol_list.addSymbol(ident, value);
+        return nullptr;
+    }
+    else
+    {
+        std::vector<int> dim_size;
+        int total_size = 1;
+        for(int i=0;i<array->size();i++)
+        {
+            int size = array->at(i)->calculate();
+            dim_size.push_back(size);
+            total_size *= size;
+        }
+        koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
+        ir->name = add_prefix("@", ident.c_str());
+        ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        ir->ty = make_array_pointer_ty(type->tag, dim_size);
+        ir->kind.tag = KOOPA_RVT_ALLOC;
+        block_manager.addInst(ir);
+
+        Value value(ValueType::Array, ir);
+        symbol_list.addSymbol(ident, value);
+
+        InitValAST *init_val = dynamic_cast<InitValAST*>(const_init_val.get());
+        if(init_val->type == InitValAST::ZERO)
+        {
+            koopa_raw_value_data *store = new koopa_raw_value_data();
+            store->name = nullptr;
+            store->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+            store->ty = make_ty(KOOPA_RTT_UNIT);
+            store->kind.tag = KOOPA_RVT_STORE;
+            store->kind.data.store.dest = (koopa_raw_value_t)ir;
+            koopa_raw_value_data *zero = new koopa_raw_value_data();
+            zero->name = nullptr;
+            zero->ty = make_array_ty(type->tag, dim_size);
+            zero->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+            zero->kind.tag = KOOPA_RVT_ZERO_INIT;
+            store->kind.data.store.value = (koopa_raw_value_t)zero;
+            block_manager.addInst(store);
+        }
+        else
+        {
+            std::vector<const void *> init_val_vec;
+            init_val->restructure(dim_size, init_val_vec);
+            assert(init_val_vec.size() == total_size);
+            std::vector<koopa_raw_value_data *> get_dim_base;
+            for(int i=0;i<total_size;i++)
+            {
+                int residual = i;
+                int elem_size = total_size;
+                for(int j=0;j<dim_size.size();j++)
+                {
+                    elem_size /= dim_size[j];
+                    int idx = residual / elem_size;
+                    residual = residual % elem_size;
+
+                    if(j < get_dim_base.size())
+                    {
+                        if(idx == get_dim_base[j]->kind.data.get_elem_ptr.index->kind.data.integer.value)
+                            continue;
+                        else
+                            while(j < get_dim_base.size())
+                                get_dim_base.pop_back();
+                    }
+                    koopa_raw_value_data *src = (j == 0)? ir : get_dim_base[j-1];
+                    koopa_raw_value_data *get_elem_ptr = new koopa_raw_value_data();
+                    get_elem_ptr->name = nullptr;
+                    get_elem_ptr->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+                    koopa_raw_type_kind *ty = new koopa_raw_type_kind();
+                    ty->tag = KOOPA_RTT_POINTER;
+                    ty->data.pointer.base = src->ty->data.pointer.base->data.array.base;
+                    get_elem_ptr->ty = ty;
+                    //get_elem_ptr->ty = make_ty(KOOPA_RTT_INT32);
+                    get_elem_ptr->kind.tag = KOOPA_RVT_GET_ELEM_PTR;
+                    get_elem_ptr->kind.data.get_elem_ptr.src = src;
+                    get_elem_ptr->kind.data.get_elem_ptr.index = (koopa_raw_value_t)NumberAST(idx).toKoopaIR();
+                    block_manager.addInst(get_elem_ptr);
+                    get_dim_base.push_back(get_elem_ptr);
+                }
+                koopa_raw_value_data *store = new koopa_raw_value_data();
+                store->name = nullptr;
+                store->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+                store->ty = make_ty(KOOPA_RTT_UNIT);
+                store->kind.tag = KOOPA_RVT_STORE;
+                store->kind.data.store.dest = (koopa_raw_value_t)get_dim_base[dim_size.size() - 1];
+                store->kind.data.store.value = (koopa_raw_value_t)init_val_vec[i];
+                block_manager.addInst(store);
+            }
+        }
+        return nullptr;
+    }
+}
+
+void *ConstDefAST::toKoopaIR(koopa_raw_type_t type, std::vector<const void *> &values) const {
+    if(array==nullptr)
+    {
+        int val = const_init_val->calculate();
+        Value value(ValueType::Const, val);
+        symbol_list.addSymbol(ident, value);
+        return nullptr;
+    }
+    else
+    {
+        std::vector<int> dim_size;
+        int total_size = 1;
+        for(int i=0;i<array->size();i++)
+        {
+            int size = array->at(i)->calculate();
+            dim_size.push_back(size);
+            total_size *= size;
+        }
+        koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
+        ir->name = add_prefix("@", ident.c_str());
+        ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        ir->ty = make_array_pointer_ty(type->tag, dim_size);
+        ir->kind.tag = KOOPA_RVT_GLOBAL_ALLOC;
+        values.push_back(ir);
+
+        Value value(ValueType::Array, ir);
+        symbol_list.addSymbol(ident, value);
+
+        InitValAST *init_val = dynamic_cast<InitValAST*>(const_init_val.get());
+        if(init_val->type == InitValAST::ZERO)
+        {
+            koopa_raw_value_data *zero = new koopa_raw_value_data();
+            zero->name = nullptr;
+            zero->ty = make_array_ty(type->tag, dim_size);
+            zero->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+            zero->kind.tag = KOOPA_RVT_ZERO_INIT;
+            ir->kind.data.global_alloc.init = (koopa_raw_value_t)zero;
+        }
+        else
+        {
+            std::vector<const void *> init_val_vec;
+            init_val->restructure(dim_size, init_val_vec);
+            assert(init_val_vec.size() == total_size);
+            ir->kind.data.global_alloc.init = (koopa_raw_value_t)init_val->toKoopaIR(init_val_vec, dim_size);
+        }
+        return nullptr;
+    }
 }
 
 void VarDefAST::Dump() const {
@@ -559,48 +744,215 @@ void *VarDefAST::toKoopaIR(std::vector<const void *> &stmts, koopa_raw_type_t ty
 */
 
 void *VarDefAST::toKoopaIR(koopa_raw_type_t type) const {
-    koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
-    ir->name = add_prefix("@", ident.c_str());
-    ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-    ir->ty = make_pointer_ty(KOOPA_RTT_INT32);
-    ir->kind.tag = KOOPA_RVT_ALLOC;
-    //stmts.push_back(ir);
-    block_manager.addInst(ir);
-    Value value(ValueType::Var, ir);
-    symbol_list.addSymbol(ident, value);
-    if(var_init_val!=nullptr) {
-        koopa_raw_value_data_t *ir2 = new koopa_raw_value_data_t;
-        ir2->name = nullptr;
-        ir2->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-        ir2->ty = make_ty(KOOPA_RTT_INT32);//KOOPA_RTT_INT32?
-        ir2->kind.tag = KOOPA_RVT_STORE;
-        ir2->kind.data.store.dest = (koopa_raw_value_t)ir;
-        ir2->kind.data.store.value = (koopa_raw_value_t)(var_init_val->toKoopaIR());
-        block_manager.addInst(ir2);
+    if(array == nullptr)
+    {
+        koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
+        ir->name = add_prefix("@", ident.c_str());
+        ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        ir->ty = make_pointer_ty(KOOPA_RTT_INT32);
+        ir->kind.tag = KOOPA_RVT_ALLOC;
+        //stmts.push_back(ir);
+        block_manager.addInst(ir);
+        Value value(ValueType::Var, ir);
+        symbol_list.addSymbol(ident, value);
+        if(var_init_val!=nullptr) {
+            koopa_raw_value_data_t *ir2 = new koopa_raw_value_data_t;
+            ir2->name = nullptr;
+            ir2->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+            ir2->ty = make_ty(KOOPA_RTT_INT32);//KOOPA_RTT_INT32?
+            ir2->kind.tag = KOOPA_RVT_STORE;
+            ir2->kind.data.store.dest = (koopa_raw_value_t)ir;
+            ir2->kind.data.store.value = (koopa_raw_value_t)(var_init_val->toKoopaIR());
+            block_manager.addInst(ir2);
+        }
+        return nullptr;
     }
-    return nullptr;
+    else
+    {
+        std::vector<int> dim_size;
+        int total_size = 1;
+        for(int i=0;i<array->size();i++)
+        {
+            int size = array->at(i)->calculate();
+            dim_size.push_back(size);
+            total_size *= size;
+        }
+        koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
+        ir->name = add_prefix("@", ident.c_str());
+        ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        ir->ty = make_array_pointer_ty(type->tag, dim_size);
+
+        ir->kind.tag = KOOPA_RVT_ALLOC;
+        block_manager.addInst(ir);
+
+        Value value(ValueType::Array, ir);
+        symbol_list.addSymbol(ident, value);
+
+        if(var_init_val != nullptr)
+        {
+            InitValAST *init_val = dynamic_cast<InitValAST*>(var_init_val.get());
+            if(init_val->type == InitValAST::ZERO)
+            {
+                koopa_raw_value_data *store = new koopa_raw_value_data();
+                store->name = nullptr;
+                store->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+                store->ty = make_ty(KOOPA_RTT_UNIT);
+                store->kind.tag = KOOPA_RVT_STORE;
+                store->kind.data.store.dest = (koopa_raw_value_t)ir;
+                koopa_raw_value_data *zero = new koopa_raw_value_data();
+                zero->name = nullptr;
+                zero->ty = make_array_ty(type->tag, dim_size);
+                zero->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+                zero->kind.tag = KOOPA_RVT_ZERO_INIT;
+                store->kind.data.store.value = (koopa_raw_value_t)zero;
+                block_manager.addInst(store);
+            }
+            else
+            {
+                std::vector<const void *> init_val_vec;
+                init_val->restructure(dim_size, init_val_vec);
+                assert(total_size == init_val_vec.size());
+                std::vector<koopa_raw_value_data *> get_dim_base;
+                for(int i=0;i<total_size;i++)
+                {
+                    int residual = i;
+                    int elem_size = total_size;
+                    for(int j=0;j<dim_size.size();j++)
+                    {
+                        elem_size /= dim_size[j];
+                        int idx = residual / elem_size;
+                        residual = residual % elem_size;
+
+                        if(j < get_dim_base.size())
+                        {
+                            if(idx == get_dim_base[j]->kind.data.get_elem_ptr.index->kind.data.integer.value)
+                                continue;
+                            else
+                                while(j < get_dim_base.size())
+                                    get_dim_base.pop_back();
+                        }
+                        koopa_raw_value_data *src = (j == 0) ? ir : get_dim_base[j-1];
+                        koopa_raw_value_data *get_elem_ptr = new koopa_raw_value_data();
+                        get_elem_ptr->name = nullptr;
+                        get_elem_ptr->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+                        koopa_raw_type_kind *ty = new koopa_raw_type_kind();
+                        ty->tag = KOOPA_RTT_POINTER;
+                        ty->data.pointer.base = src->ty->data.pointer.base->data.array.base;
+                        get_elem_ptr->ty = ty;
+                        //get_elem_ptr->ty = make_ty(KOOPA_RTT_INT32);
+                        get_elem_ptr->kind.tag = KOOPA_RVT_GET_ELEM_PTR;
+                        get_elem_ptr->kind.data.get_elem_ptr.src = src;
+                        get_elem_ptr->kind.data.get_elem_ptr.index = (koopa_raw_value_t)NumberAST(idx).toKoopaIR();
+                        block_manager.addInst(get_elem_ptr);
+                        get_dim_base.push_back(get_elem_ptr);
+                    }
+                    koopa_raw_value_data *store = new koopa_raw_value_data();
+                    store->name = nullptr;
+                    store->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+                    store->ty = make_ty(KOOPA_RTT_UNIT);
+                    store->kind.tag = KOOPA_RVT_STORE;
+                    store->kind.data.store.dest = (koopa_raw_value_t)get_dim_base[dim_size.size() - 1];
+                    store->kind.data.store.value = (koopa_raw_value_t)init_val_vec[i];
+                    block_manager.addInst(store);
+                }
+            }
+        }
+        else
+        {
+            koopa_raw_value_data *store = new koopa_raw_value_data();
+            store->name = nullptr;
+            store->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+            store->ty = make_ty(KOOPA_RTT_UNIT);
+            store->kind.tag = KOOPA_RVT_STORE;
+            store->kind.data.store.dest = (koopa_raw_value_t)ir;
+            koopa_raw_value_data *zero = new koopa_raw_value_data();
+            zero->name = nullptr;
+            zero->ty = make_array_ty(type->tag, dim_size);
+            zero->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+            zero->kind.tag = KOOPA_RVT_ZERO_INIT;
+            store->kind.data.store.value = (koopa_raw_value_t)zero;
+            block_manager.addInst(store);
+        }
+        return nullptr;
+    }
+    
 }
 
 void *VarDefAST::toKoopaIR(koopa_raw_type_t type, std::vector<const void *> &values) const {
-    koopa_raw_value_data *ir = new koopa_raw_value_data;
-    ir->name = add_prefix("@", ident.c_str());
-    ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-    ir->ty = make_pointer_ty(type->tag);
-    ir->kind.tag = KOOPA_RVT_GLOBAL_ALLOC;
-    if(var_init_val!=nullptr) {
-        ir->kind.data.global_alloc.init = (koopa_raw_value_t)(var_init_val->toKoopaIR());
+    if(array == nullptr)
+    {
+        koopa_raw_value_data *ir = new koopa_raw_value_data;
+        ir->name = add_prefix("@", ident.c_str());
+        ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        ir->ty = make_pointer_ty(type->tag);
+        ir->kind.tag = KOOPA_RVT_GLOBAL_ALLOC;
+        if(var_init_val!=nullptr) {
+            ir->kind.data.global_alloc.init = (koopa_raw_value_t)(var_init_val->toKoopaIR());
+        }
+        else {
+            koopa_raw_value_data_t *zero = new koopa_raw_value_data_t;
+            zero->name = nullptr;
+            zero->ty = make_ty(KOOPA_RTT_INT32);
+            zero->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+            zero->kind.tag = KOOPA_RVT_ZERO_INIT;
+            ir->kind.data.global_alloc.init = (koopa_raw_value_t)zero;
+        }
+        values.push_back(ir);
+        symbol_list.addSymbol(ident, Value(ValueType::Var, ir));
+        return nullptr;
     }
-    else {
-        koopa_raw_value_data_t *zero = new koopa_raw_value_data_t;
-        zero->name = nullptr;
-        zero->ty = make_ty(KOOPA_RTT_INT32);
-        zero->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-        zero->kind.tag = KOOPA_RVT_ZERO_INIT;
-        ir->kind.data.global_alloc.init = (koopa_raw_value_t)zero;
+    else
+    {
+        std::vector<int> dim_size;
+        int total_size = 1;
+        for(int i=0;i<array->size();i++)
+        {
+            int size = array->at(i)->calculate();
+            dim_size.push_back(size);
+            total_size *= size;
+        }
+        koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
+        ir->name = add_prefix("@", ident.c_str());
+        ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        ir->ty = make_array_pointer_ty(type->tag, dim_size);
+        ir->kind.tag = KOOPA_RVT_GLOBAL_ALLOC;
+        values.push_back(ir);
+
+        Value value(ValueType::Array, ir);
+        symbol_list.addSymbol(ident, value);
+
+        if(var_init_val != nullptr)
+        {
+            InitValAST *init_val = dynamic_cast<InitValAST*>(var_init_val.get());
+            if(init_val->type == InitValAST::ZERO)
+            {
+                koopa_raw_value_data *zero = new koopa_raw_value_data();
+                zero->name = nullptr;
+                zero->ty = make_array_ty(type->tag, dim_size);
+                zero->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+                zero->kind.tag = KOOPA_RVT_ZERO_INIT;
+                ir->kind.data.global_alloc.init = (koopa_raw_value_t)zero;
+            }
+            else
+            {
+                std::vector<const void *> init_val_vec;
+                init_val->restructure(dim_size, init_val_vec);
+                assert(total_size == init_val_vec.size());
+                ir->kind.data.global_alloc.init = (koopa_raw_value_t)init_val->toKoopaIR(init_val_vec, dim_size);
+            }
+        }
+        else
+        {
+            koopa_raw_value_data *zero = new koopa_raw_value_data();
+            zero->name = nullptr;
+            zero->ty = make_array_ty(type->tag, dim_size);
+            zero->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+            zero->kind.tag = KOOPA_RVT_ZERO_INIT;
+            ir->kind.data.global_alloc.init = (koopa_raw_value_t)zero;
+        }
+        return nullptr;
     }
-    values.push_back(ir);
-    symbol_list.addSymbol(ident, Value(ValueType::Var, ir));
-    return nullptr;
+    
 }
 
 void ConstInitValAST::Dump() const {
@@ -634,7 +986,97 @@ void *InitValAST::toKoopaIR(std::vector<const void *> &stmts) const {
 */
 
 void *InitValAST::toKoopaIR() const {
-    return exp->toKoopaIR();
+    if(type == EXP)
+        return exp->toKoopaIR();
+    assert(false);
+    return nullptr;
+}
+
+void *InitValAST::toKoopaIR(std::vector<const void *> &init_val_vec, std::vector<int> dim_size) const 
+{
+    std::vector<const void *> *aggregate_vec = new std::vector<const void *>();
+    if(dim_size.size() == 1)
+    {
+        for(int i=0;i<dim_size[0];i++)
+        {
+            aggregate_vec->push_back(init_val_vec[0]);
+            init_val_vec.erase(init_val_vec.begin());
+        }
+    }
+    else
+    {
+        for(int i=0;i<dim_size[0];i++)
+        {
+            std::vector<int> sub_dim_size;
+            for(int j=1;j<dim_size.size();j++)
+            {
+                sub_dim_size.push_back(dim_size[j]);
+            }
+            aggregate_vec->push_back(toKoopaIR(init_val_vec, sub_dim_size));
+        }
+    }
+    koopa_raw_value_data *ir = new koopa_raw_value_data();
+    ir->ty = make_array_ty(KOOPA_RTT_INT32, dim_size);
+    ir->name = nullptr;
+    ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+    ir->kind.tag = KOOPA_RVT_AGGREGATE;
+    ir->kind.data.aggregate.elems = make_slice(aggregate_vec, KOOPA_RSIK_VALUE);
+    return ir;
+}
+
+void InitValAST::restructure(std::vector<int> dim_size, std::vector<const void *> &init_val_vec) const
+{
+    int total_size = 1;
+    for(int i=0;i<dim_size.size();i++)
+    {
+        total_size *= dim_size[i];
+    }
+    if(type == ZERO)
+    {
+        for(int i=0;i<total_size;i++)
+        {
+            init_val_vec.push_back(NumberAST(0).toKoopaIR());
+            //std::cout<<0<<' ';
+        }
+    }
+    else
+    {
+        int len_n = dim_size.back();
+        for(auto i = init_val_array->begin(); i != init_val_array->end(); i++)
+        {
+            InitValAST *init_val = dynamic_cast<InitValAST*>(i->get());
+            if(init_val->type == EXP)
+            {
+                init_val_vec.push_back(NumberAST(init_val->calculate()).toKoopaIR());
+                //std::cout<<init_val->calculate()<<' ';
+            }
+            else
+            {
+                int cur_size = init_val_vec.size();
+                assert(cur_size % len_n == 0);
+                int align_size = cur_size / len_n;
+                int dim_count = 1;
+                for(int i = dim_size.size() - 2; i >= 1; i++)
+                {
+                    if(align_size % dim_size[i] != 0)
+                        break;
+                    dim_count++;
+                    align_size /= dim_size[i];
+                }
+                std::vector<int> sub_dim_size;
+                for(int i = dim_size.size() - dim_count; i < dim_size.size(); i++)
+                {
+                    sub_dim_size.push_back(dim_size[i]);
+                }
+                init_val->restructure(sub_dim_size, init_val_vec);
+            }
+        }
+    }   
+    while(init_val_vec.size() % total_size != 0)
+    {
+        init_val_vec.push_back(NumberAST(0).toKoopaIR());
+        //std::cout<<0<<' ';
+    }
 }
 
 int InitValAST::calculate() const {
@@ -1722,6 +2164,138 @@ void *LValAST::toKoopaIR() const {
         ir->kind.tag = KOOPA_RVT_INTEGER;
         ir->kind.data.integer.value = value.data.const_value;
     }
+    else if(value.type == ValueType::Array)
+    {
+        koopa_raw_value_t last = value.data.array_value;
+        if(array != nullptr)
+        {
+            for(int i=0;i<array->size();i++)
+            {
+                koopa_raw_value_data *get_elem_ptr = new koopa_raw_value_data();
+                get_elem_ptr->name = nullptr;
+                get_elem_ptr->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+                get_elem_ptr->kind.tag = KOOPA_RVT_GET_ELEM_PTR;
+                koopa_raw_type_kind *ty = new koopa_raw_type_kind;
+                ty->tag = KOOPA_RTT_POINTER;
+                ty->data.pointer.base = last->ty->data.pointer.base->data.array.base;
+                get_elem_ptr->ty = ty;
+                get_elem_ptr->kind.data.get_elem_ptr.index = (koopa_raw_value_t)array->at(i)->toKoopaIR();
+                get_elem_ptr->kind.data.get_elem_ptr.src = last;
+                block_manager.addInst(get_elem_ptr);
+                last = get_elem_ptr;   
+            }
+        }
+        if(array == nullptr)
+        {
+            koopa_raw_value_data *get_elem_ptr = new koopa_raw_value_data();
+            get_elem_ptr->name = nullptr;
+            get_elem_ptr->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+            get_elem_ptr->kind.tag = KOOPA_RVT_GET_ELEM_PTR;
+            koopa_raw_type_kind *ty = new koopa_raw_type_kind;
+            ty->tag = KOOPA_RTT_POINTER;
+            ty->data.pointer.base = last->ty->data.pointer.base->data.array.base;
+            get_elem_ptr->ty = ty;
+            get_elem_ptr->kind.data.get_elem_ptr.index = (koopa_raw_value_t)NumberAST(0).toKoopaIR();
+            get_elem_ptr->kind.data.get_elem_ptr.src = (koopa_raw_value_t)value.data.array_value;
+            block_manager.addInst(get_elem_ptr);
+            ir = get_elem_ptr;
+        }
+        else if(last->ty->data.pointer.base->tag == KOOPA_RTT_ARRAY)
+        {
+            koopa_raw_value_data *get_elem_ptr = new koopa_raw_value_data();
+            get_elem_ptr->name = nullptr;
+            get_elem_ptr->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+            get_elem_ptr->kind.tag = KOOPA_RVT_GET_ELEM_PTR;
+            koopa_raw_type_kind *ty = new koopa_raw_type_kind;
+            ty->tag = KOOPA_RTT_POINTER;
+            ty->data.pointer.base = last->ty->data.pointer.base->data.array.base;
+            get_elem_ptr->ty = ty;
+            get_elem_ptr->kind.data.get_elem_ptr.index = (koopa_raw_value_t)NumberAST(0).toKoopaIR();
+            get_elem_ptr->kind.data.get_elem_ptr.src = last;
+            block_manager.addInst(get_elem_ptr);
+            ir = get_elem_ptr;
+        }
+        else
+        {
+            ir->kind.tag = KOOPA_RVT_LOAD;
+            ir->kind.data.load.src = last;
+            block_manager.addInst(ir);
+        }
+    }
+    else if(value.type == ValueType::Pointer)
+    {
+        koopa_raw_value_data *load = new koopa_raw_value_data();
+        load->name = nullptr;
+        load->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        load->kind.tag = KOOPA_RVT_LOAD;
+        load->ty = value.data.pointer_value->ty->data.pointer.base;
+        load->kind.data.load.src = (koopa_raw_value_t)value.data.pointer_value;
+        block_manager.addInst(load);
+        koopa_raw_value_t last = value.data.pointer_value;
+
+        if(array!=nullptr)
+        {
+            koopa_raw_value_data *get_elem_ptr = new koopa_raw_value_data();
+            get_elem_ptr->name = nullptr;
+            get_elem_ptr->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+            get_elem_ptr->kind.tag = KOOPA_RVT_GET_PTR;
+            get_elem_ptr->ty = load->ty;
+            get_elem_ptr->kind.data.get_ptr.src = load;
+            get_elem_ptr->kind.data.get_elem_ptr.index = (koopa_raw_value_t)array->at(0)->toKoopaIR();
+            block_manager.addInst(get_elem_ptr);
+
+            last = get_elem_ptr;
+
+            for(int i=1;i<array->size();i++)
+            {
+                koopa_raw_value_data *get_elem_ptr = new koopa_raw_value_data();
+                get_elem_ptr->name = nullptr;
+                get_elem_ptr->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+                get_elem_ptr->kind.tag = KOOPA_RVT_GET_ELEM_PTR;
+                koopa_raw_type_kind *ty = new koopa_raw_type_kind;
+                ty->tag = KOOPA_RTT_POINTER;
+                ty->data.pointer.base = last->ty->data.pointer.base->data.array.base;
+                get_elem_ptr->ty = ty;
+                get_elem_ptr->kind.data.get_elem_ptr.index = (koopa_raw_value_t)array->at(i)->toKoopaIR();
+                get_elem_ptr->kind.data.get_elem_ptr.src = last;
+                block_manager.addInst(get_elem_ptr);
+                last = get_elem_ptr;         
+            }
+        }
+        if(array == nullptr)
+        {
+            koopa_raw_value_data *get_elem_ptr = new koopa_raw_value_data();
+            get_elem_ptr->name = nullptr;
+            get_elem_ptr->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+            get_elem_ptr->kind.tag = KOOPA_RVT_GET_PTR;
+            get_elem_ptr->ty = load->ty;
+            get_elem_ptr->kind.data.get_ptr.src = load;
+            get_elem_ptr->kind.data.get_elem_ptr.index = (koopa_raw_value_t)NumberAST(0).toKoopaIR();
+            block_manager.addInst(get_elem_ptr);
+            ir = get_elem_ptr;
+        }
+        else if(last->ty->data.pointer.base->tag == KOOPA_RTT_ARRAY)
+        {
+            koopa_raw_value_data *get_elem_ptr = new koopa_raw_value_data();
+            get_elem_ptr->name = nullptr;
+            get_elem_ptr->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+            get_elem_ptr->kind.tag = KOOPA_RVT_GET_ELEM_PTR;
+            koopa_raw_type_kind *ty = new koopa_raw_type_kind;
+            ty->tag = KOOPA_RTT_POINTER;
+            ty->data.pointer.base = last->ty->data.pointer.base->data.array.base;
+            get_elem_ptr->ty = ty;
+            get_elem_ptr->kind.data.get_elem_ptr.index = (koopa_raw_value_t)NumberAST(0).toKoopaIR();
+            get_elem_ptr->kind.data.get_elem_ptr.src = last;
+            block_manager.addInst(get_elem_ptr);
+            ir = get_elem_ptr;
+        }
+        else
+        {
+            ir->kind.tag = KOOPA_RVT_LOAD;
+            ir->kind.data.load.src = (koopa_raw_value_t)last;
+            block_manager.addInst(ir);
+        }
+    }
     return ir;
 }
 
@@ -1738,6 +2312,68 @@ void *LValAST::getKoopaIR() const {
     if(value.type == ValueType::Var) {
         return (void *)value.data.var_value;
     }
+    else if(value.type == ValueType::Array)
+    {
+        koopa_raw_value_t last = value.data.array_value;
+        for(int i=0;i<array->size();i++)
+        {
+            koopa_raw_value_data *get_elem_ptr = new koopa_raw_value_data();
+            get_elem_ptr->name = nullptr;
+            get_elem_ptr->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+            get_elem_ptr->kind.tag = KOOPA_RVT_GET_ELEM_PTR;
+            koopa_raw_type_kind *ty = new koopa_raw_type_kind;
+            ty->tag = KOOPA_RTT_POINTER;
+            ty->data.pointer.base = last->ty->data.pointer.base->data.array.base;
+            get_elem_ptr->ty = ty;
+            get_elem_ptr->kind.data.get_elem_ptr.index = (koopa_raw_value_t)array->at(i)->toKoopaIR();
+            get_elem_ptr->kind.data.get_elem_ptr.src = last;
+            block_manager.addInst(get_elem_ptr);
+            last = get_elem_ptr;         
+        }
+        return (void*)last;
+    }
+    else if(value.type == ValueType::Pointer)
+    {
+        koopa_raw_value_t last = value.data.pointer_value;
+
+        koopa_raw_value_data *load = new koopa_raw_value_data();
+        load->name = nullptr;
+        load->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        load->kind.tag = KOOPA_RVT_LOAD;
+        load->ty = last->ty->data.pointer.base;
+        load->kind.data.load.src = (koopa_raw_value_t)last;
+        block_manager.addInst(load);
+
+
+        koopa_raw_value_data *get_elem_ptr = new koopa_raw_value_data();
+        get_elem_ptr->name = nullptr;
+        get_elem_ptr->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+        get_elem_ptr->kind.tag = KOOPA_RVT_GET_PTR;
+        get_elem_ptr->ty = load->ty;
+        get_elem_ptr->kind.data.get_ptr.src = load;
+        get_elem_ptr->kind.data.get_elem_ptr.index = (koopa_raw_value_t)array->at(0)->toKoopaIR();
+        block_manager.addInst(get_elem_ptr);
+
+        last = get_elem_ptr;
+
+        for(int i=1;i<array->size();i++)
+        {
+            koopa_raw_value_data *get_elem_ptr = new koopa_raw_value_data();
+            get_elem_ptr->name = nullptr;
+            get_elem_ptr->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
+            get_elem_ptr->kind.tag = KOOPA_RVT_GET_ELEM_PTR;
+            koopa_raw_type_kind *ty = new koopa_raw_type_kind;
+            ty->tag = KOOPA_RTT_POINTER;
+            ty->data.pointer.base = last->ty->data.pointer.base->data.array.base;
+            get_elem_ptr->ty = ty;
+            get_elem_ptr->kind.data.get_elem_ptr.index = (koopa_raw_value_t)array->at(i)->toKoopaIR();
+            get_elem_ptr->kind.data.get_elem_ptr.src = last;
+            block_manager.addInst(get_elem_ptr);
+            last = get_elem_ptr;         
+        }
+        return (void *)last;
+    }
+
     return nullptr;
 }
 
