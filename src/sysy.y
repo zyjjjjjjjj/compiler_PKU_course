@@ -475,15 +475,6 @@ Exp
   }
   ;
 
-  /*
-  | '{' Exp '}' {
-    auto ast = new ExpAST();
-    ast->lor_exp = unique_ptr<BaseAST>($2);
-    $$ = ast;
-  }
-  ;
-  */
-
 LOrExp
   : LAndExp {
     auto ast = new LOrExpAST();

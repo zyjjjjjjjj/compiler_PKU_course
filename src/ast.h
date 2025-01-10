@@ -61,15 +61,6 @@ class FuncDefAST : public BaseAST {
   void *toKoopaIR() const override;
 };
 
-// FuncTypeAST 派生类
-class FuncTypeAST : public BaseAST {
- public:
-  std::string func_type;
-
-  void Dump() const override;
-  void *toKoopaIR() const override;
-};
-
 class FuncFParamAST : public BaseAST {
  public:
   std::unique_ptr<BaseAST> type;

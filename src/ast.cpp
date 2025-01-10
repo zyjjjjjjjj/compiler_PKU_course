@@ -9,15 +9,6 @@ void CompUnitAST::Dump() const {
     }
     std::cout << " }\n";
 }
-/*
-void *CompUnitAST::toKoopaIR() const {
-    std::vector<const void *> function{func_def->toKoopaIR()};
-    koopa_raw_program_t *ir = new koopa_raw_program_t;
-    ir->funcs = make_slice(&function, KOOPA_RSIK_FUNCTION);
-    ir->values = make_slice(nullptr, KOOPA_RSIK_VALUE);
-    return ir;
-}
-*/
 
 void CompUnitAST::DeclineLibFunc(std::vector<const void *> &functions) const{
     koopa_raw_function_data_t *func;
@@ -142,39 +133,6 @@ void FuncDefAST::Dump() const {
     block->Dump();
     std::cout << " }";
 }
-/*
-void *FuncDefAST::toKoopaIR() const {
-    //symbol_list.newScope();
-    //std::vector<const void *> blocks{block->toKoopaIR()};
-    //symbol_list.deleteScope();
-    koopa_raw_function_data_t *ir = new koopa_raw_function_data_t;
-    ir->name = add_prefix("@", ident.c_str());
-    ir->ty = make_func_ty(nullptr, (const koopa_raw_type_kind *)func_type->toKoopaIR());
-    ir->params = make_slice(nullptr, KOOPA_RSIK_VALUE);
-
-    std::vector<const void *> blocks;
-    block_manager.init(&blocks);
-    koopa_raw_basic_block_data_t *entry = new koopa_raw_basic_block_data_t();
-    entry->name = add_prefix("%", "entry");
-    entry->params = make_slice(nullptr, KOOPA_RSIK_VALUE);
-    entry->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-    block_manager.newBlock(entry);
-    block->toKoopaIR();
-    if(block_manager.willBlockReturn())
-    {
-        koopa_raw_value_data_t *ret = new koopa_raw_value_data_t;
-        ret->name = nullptr;
-        ret->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-        ret->ty = make_ty(KOOPA_RTT_UNIT);
-        ret->kind.tag = KOOPA_RVT_RETURN;
-        ret->kind.data.ret.value = (koopa_raw_value_data_t *)NumberAST(0).toKoopaIR();
-        block_manager.addInst(ret);
-    }
-    block_manager.popBuffer();
-    ir->bbs = make_slice(&blocks, KOOPA_RSIK_BASIC_BLOCK);
-    return ir;
-}
-*/
 
 void *FuncDefAST::toKoopaIR() const {
     koopa_raw_function_data_t *ir = new koopa_raw_function_data_t;
@@ -262,22 +220,6 @@ void *FuncDefAST::toKoopaIR() const {
 
 }
 
-// FuncTypeAST 类的实现
-void FuncTypeAST::Dump() const {
-    std::cout << "FuncTypeAST { " << func_type << " }";
-}
-
-void *FuncTypeAST::toKoopaIR() const {
-    koopa_raw_type_kind_t *ir = new koopa_raw_type_kind_t;
-    if(func_type == "int") {
-        ir->tag = KOOPA_RTT_INT32;
-    }
-    else if(func_type == "void") {
-        ir->tag = KOOPA_RTT_UNIT;
-    }
-    return ir;
-}
-
 void FuncFParamAST::Dump() const {
     std::cout << "FuncFParamAST { ";
     type->Dump();
@@ -333,31 +275,11 @@ void BlockAST::Dump() const {
 }
 
 void *BlockAST::toKoopaIR() const {
-    //std::vector<const void *> stmts;
-    //koopa_raw_basic_block_data_t *ir = new koopa_raw_basic_block_data_t;
     if(block_item_array) {
-        //symbol_list.newScope();
         for(auto &block_item : *block_item_array) {
-            //block_item->toKoopaIR(stmts);
             block_item->toKoopaIR();
-            /*
-            if (stmts.size() > 0) {
-                auto inst = (koopa_raw_value_t)stmts.back();
-                if (inst->kind.tag == KOOPA_RVT_RETURN) {
-                    break;
-                }
-            }
-            */
         }
-        //symbol_list.deleteScope();
-        //ir->insts = make_slice(&stmts, KOOPA_RSIK_VALUE);
     }
-    //else {
-    //    ir->insts = make_slice(nullptr, KOOPA_RSIK_VALUE);
-    //}
-    //ir->name = add_prefix("%", "entry");
-    //ir->params = make_slice(nullptr, KOOPA_RSIK_VALUE);
-    //ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
     return nullptr;
 }
 
@@ -397,17 +319,6 @@ void BlockItemAST::Dump() const {
     }
     std::cout << " }";
 }
-/*
-void *BlockItemAST::toKoopaIR(std::vector<const void *> &stmts) const {
-    if(block_item_type == "DECL") {
-        return decl->toKoopaIR(stmts);
-    }
-    else if(block_item_type == "STMT") {
-        return stmt->toKoopaIR(stmts);
-    }
-    return nullptr;
-}
-*/
 
 void *BlockItemAST::toKoopaIR() const {
     if(block_item_type == "DECL") {
@@ -429,18 +340,6 @@ void DeclAST::Dump() const {
     }
     std::cout << " }";
 }
-
-/*
-void *DeclAST::toKoopaIR(std::vector<const void *> &stmts) const {
-    if(decl_type == "CONST") {
-        return const_decl->toKoopaIR(stmts);
-    }
-    else if(decl_type == "VAR") {
-        return var_decl->toKoopaIR(stmts);
-    }
-    return nullptr;
-}
-*/
 
 void *DeclAST::toKoopaIR() const {
     if(decl_type == "CONST") {
@@ -470,14 +369,6 @@ void ConstDeclAST::Dump() const {
     }
     std::cout << " }";
 }
-/*
-void *ConstDeclAST::toKoopaIR(std::vector<const void *> &stmts) const {
-    for(auto &const_def : *const_def_array) {
-        const_def->toKoopaIR(stmts);
-    }
-    return nullptr;
-}
-*/
 
 void *ConstDeclAST::toKoopaIR() const {
     koopa_raw_type_t const_type = (const koopa_raw_type_t)type->toKoopaIR();
@@ -503,15 +394,6 @@ void VarDeclAST::Dump() const {
     }
     std::cout << " }";
 }
-/*
-void *VarDeclAST::toKoopaIR(std::vector<const void *> &stmts) const {
-    koopa_raw_type_t var_type = (const koopa_raw_type_t)type->toKoopaIR();
-    for(auto &var_def : *var_def_array) {
-        var_def->toKoopaIR(stmts, var_type);
-    }
-    return nullptr;
-}
-*/
 
 void *VarDeclAST::toKoopaIR() const {
     koopa_raw_type_t var_type = (const koopa_raw_type_t)type->toKoopaIR();
@@ -555,14 +437,6 @@ void ConstDefAST::Dump() const {
     }
     std::cout << " }";
 }
-/*
-void *ConstDefAST::toKoopaIR(std::vector<const void *> &stmts) const {
-    int val = const_init_val->calculate();
-    Value value(ValueType::Const, val);
-    symbol_list.addSymbol(ident, value);
-    return nullptr;
-}
-*/
 
 void *ConstDefAST::toKoopaIR(koopa_raw_type_t type) const {
     if(array==nullptr)
@@ -641,7 +515,6 @@ void *ConstDefAST::toKoopaIR(koopa_raw_type_t type) const {
                     ty->tag = KOOPA_RTT_POINTER;
                     ty->data.pointer.base = src->ty->data.pointer.base->data.array.base;
                     get_elem_ptr->ty = ty;
-                    //get_elem_ptr->ty = make_ty(KOOPA_RTT_INT32);
                     get_elem_ptr->kind.tag = KOOPA_RVT_GET_ELEM_PTR;
                     get_elem_ptr->kind.data.get_elem_ptr.src = src;
                     get_elem_ptr->kind.data.get_elem_ptr.index = (koopa_raw_value_t)NumberAST(idx).toKoopaIR();
@@ -719,29 +592,7 @@ void VarDefAST::Dump() const {
     }
     std::cout << " }";
 }
-/*
-void *VarDefAST::toKoopaIR(std::vector<const void *> &stmts, koopa_raw_type_t type) const {
-    koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
-    ir->name = add_prefix("@", ident.c_str());
-    ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-    ir->ty = make_pointer_ty(KOOPA_RTT_INT32);
-    ir->kind.tag = KOOPA_RVT_ALLOC;
-    stmts.push_back(ir);
-    Value value(ValueType::Var, ir);
-    symbol_list.addSymbol(ident, value);
-    if(var_init_val!=nullptr) {
-        koopa_raw_value_data_t *ir2 = new koopa_raw_value_data_t;
-        ir2->name = nullptr;
-        ir2->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-        ir2->ty = make_ty(KOOPA_RTT_UNIT);//KOOPA_RTT_INT32?
-        ir2->kind.tag = KOOPA_RVT_STORE;
-        ir2->kind.data.store.dest = (koopa_raw_value_t)ir;
-        ir2->kind.data.store.value = (koopa_raw_value_t)(var_init_val->toKoopaIR(stmts));
-        stmts.push_back(ir2);
-    }
-    return nullptr;
-}
-*/
+
 
 void *VarDefAST::toKoopaIR(koopa_raw_type_t type) const {
     if(array == nullptr)
@@ -751,7 +602,6 @@ void *VarDefAST::toKoopaIR(koopa_raw_type_t type) const {
         ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
         ir->ty = make_pointer_ty(KOOPA_RTT_INT32);
         ir->kind.tag = KOOPA_RVT_ALLOC;
-        //stmts.push_back(ir);
         block_manager.addInst(ir);
         Value value(ValueType::Var, ir);
         symbol_list.addSymbol(ident, value);
@@ -759,7 +609,7 @@ void *VarDefAST::toKoopaIR(koopa_raw_type_t type) const {
             koopa_raw_value_data_t *ir2 = new koopa_raw_value_data_t;
             ir2->name = nullptr;
             ir2->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-            ir2->ty = make_ty(KOOPA_RTT_INT32);//KOOPA_RTT_INT32?
+            ir2->ty = make_ty(KOOPA_RTT_INT32);
             ir2->kind.tag = KOOPA_RVT_STORE;
             ir2->kind.data.store.dest = (koopa_raw_value_t)ir;
             ir2->kind.data.store.value = (koopa_raw_value_t)(var_init_val->toKoopaIR());
@@ -839,7 +689,6 @@ void *VarDefAST::toKoopaIR(koopa_raw_type_t type) const {
                         ty->tag = KOOPA_RTT_POINTER;
                         ty->data.pointer.base = src->ty->data.pointer.base->data.array.base;
                         get_elem_ptr->ty = ty;
-                        //get_elem_ptr->ty = make_ty(KOOPA_RTT_INT32);
                         get_elem_ptr->kind.tag = KOOPA_RVT_GET_ELEM_PTR;
                         get_elem_ptr->kind.data.get_elem_ptr.src = src;
                         get_elem_ptr->kind.data.get_elem_ptr.index = (koopa_raw_value_t)NumberAST(idx).toKoopaIR();
@@ -859,21 +708,6 @@ void *VarDefAST::toKoopaIR(koopa_raw_type_t type) const {
         }
         else
         {
-            /*
-            koopa_raw_value_data *store = new koopa_raw_value_data();
-            store->name = nullptr;
-            store->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-            store->ty = make_ty(KOOPA_RTT_UNIT);
-            store->kind.tag = KOOPA_RVT_STORE;
-            store->kind.data.store.dest = (koopa_raw_value_t)ir;
-            koopa_raw_value_data *zero = new koopa_raw_value_data();
-            zero->name = nullptr;
-            zero->ty = make_array_ty(type->tag, dim_size);
-            zero->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-            zero->kind.tag = KOOPA_RVT_ZERO_INIT;
-            store->kind.data.store.value = (koopa_raw_value_t)zero;
-            block_manager.addInst(store);
-            */
         }
         return nullptr;
     }
@@ -962,11 +796,6 @@ void ConstInitValAST::Dump() const {
     const_exp->Dump();
     std::cout << " }";
 }
-/*
-void *ConstInitValAST::toKoopaIR(std::vector<const void *> &stmts) const {
-    return const_exp->toKoopaIR(stmts);
-}
-*/
 
 void *ConstInitValAST::toKoopaIR() const {
     return const_exp->toKoopaIR();
@@ -981,11 +810,6 @@ void InitValAST::Dump() const {
     exp->Dump();
     std::cout << " }";
 }
-/*
-void *InitValAST::toKoopaIR(std::vector<const void *> &stmts) const {
-    return exp->toKoopaIR(stmts);
-}
-*/
 
 void *InitValAST::toKoopaIR() const {
     if(type == EXP)
@@ -1120,42 +944,6 @@ void StmtAST::Dump() const {
     }
     std::cout << " }";
 }
-/*
-void *StmtAST::toKoopaIR(std::vector<const void *> &stmts) const {
-    koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
-    ir->name = nullptr;
-    ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-    ir->ty = make_ty(KOOPA_RTT_UNIT);
-    if(stmt_type == "RETURN") {
-        ir->kind.tag = KOOPA_RVT_RETURN;
-        if(exp) {
-            ir->kind.data.ret.value = (koopa_raw_value_data_t *)exp->toKoopaIR(stmts);
-        }
-        else {
-            ir->kind.data.ret.value = nullptr;
-        }
-        stmts.push_back(ir);
-    }
-    else if(stmt_type == "ASSIGN") {
-        ir->kind.tag = KOOPA_RVT_STORE;
-        ir->kind.data.store.dest = (koopa_raw_value_t)lval->getKoopaIR();
-        ir->kind.data.store.value = (koopa_raw_value_t)exp->toKoopaIR(stmts);
-        stmts.push_back(ir);
-    }
-    else if(stmt_type == "EXP") {
-        return exp->toKoopaIR(stmts);
-    }
-    else if(stmt_type == "BLOCK") {
-        symbol_list.newScope();
-        block->toKoopaIR(stmts);
-        symbol_list.deleteScope();
-    }
-    else if(stmt_type == "EMPTY") {
-        return nullptr;
-    }
-    return ir;
-}
-*/
 
 void *StmtAST::toKoopaIR() const {
     koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
@@ -1311,11 +1099,6 @@ void ConstExpAST::Dump() const {
     exp->Dump();
     std::cout << " }";
 }
-/*
-void *ConstExpAST::toKoopaIR(std::vector<const void *> &stmts) const {
-    return exp->toKoopaIR(stmts);
-}
-*/
 
 void *ConstExpAST::toKoopaIR() const {
     return exp->toKoopaIR();
@@ -1324,11 +1107,6 @@ void *ConstExpAST::toKoopaIR() const {
 int ConstExpAST::calculate() const {
     return exp->calculate();
 }
-/*
-void *ExpAST::toKoopaIR(std::vector<const void *> &stmts) const {
-    return lor_exp->toKoopaIR(stmts);
-}
-*/
 
 void *ExpAST::toKoopaIR() const {
     return lor_exp->toKoopaIR();
@@ -1357,41 +1135,9 @@ void LOrExpAST::Dump() const {
     }
     std::cout << " }";
 }
-/*
-void *LOrExpAST::toKoopaIR(std::vector<const void *> &stmts) const {
-    koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
-    if(op == "||") {
-        ir->name = nullptr;
-        ir->ty = make_ty(KOOPA_RTT_INT32);
-        ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-        ir->kind.tag = KOOPA_RVT_BINARY;
-        ir->kind.data.binary.op = KOOPA_RBO_OR;
-        ir->kind.data.binary.lhs = (koopa_raw_value_t)toBoolKoopaIR(lor_exp, stmts);
-        ir->kind.data.binary.rhs = (koopa_raw_value_t)toBoolKoopaIR(land_exp, stmts);
-        stmts.push_back(ir);
-        return ir;
-    }
-    else if(op == " ") {
-        return land_exp->toKoopaIR(stmts);
-    }
-    return nullptr;
-}
-*/
 
 void *LOrExpAST::toKoopaIR() const {
-    //koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
     if(op == "||") {
-        /*
-        ir->name = nullptr;
-        ir->ty = make_ty(KOOPA_RTT_INT32);
-        ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-        ir->kind.tag = KOOPA_RVT_BINARY;
-        ir->kind.data.binary.op = KOOPA_RBO_OR;
-        ir->kind.data.binary.lhs = (koopa_raw_value_t)toBoolKoopaIR(lor_exp);
-        ir->kind.data.binary.rhs = (koopa_raw_value_t)toBoolKoopaIR(land_exp);
-        block_manager.addInst(ir);
-        return ir;
-        */
         koopa_raw_value_data *temp_alloc = new koopa_raw_value_data;
         temp_alloc->name = add_prefix("@", "temp");
         temp_alloc->ty = make_pointer_ty(KOOPA_RTT_INT32);
@@ -1460,21 +1206,6 @@ int LOrExpAST::calculate() const {
     }
     return 0;
 }
-/*
-void *LOrExpAST::toBoolKoopaIR(const std::unique_ptr<BaseAST> &exp, std::vector<const void *> &stmts) const {
-    koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
-    ir->name = nullptr;
-    ir->ty = make_ty(KOOPA_RTT_INT32);
-    ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-    ir->kind.tag = KOOPA_RVT_BINARY;
-    ir->kind.data.binary.op = KOOPA_RBO_NOT_EQ;
-    NumberAST zero(0);
-    ir->kind.data.binary.lhs = (koopa_raw_value_t)zero.toKoopaIR();
-    ir->kind.data.binary.rhs = (koopa_raw_value_t)exp->toKoopaIR(stmts);
-    stmts.push_back(ir);
-    return ir;
-}
-*/
 
 void *LOrExpAST::toBoolKoopaIR(const std::unique_ptr<BaseAST> &exp) const {
     koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
@@ -1503,41 +1234,9 @@ void LAndExpAST::Dump() const {
     }
     std::cout << " }";
 }
-/*
-void *LAndExpAST::toKoopaIR(std::vector<const void *> &stmts) const {
-    koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
-    if(op == "&&") {
-        ir->name = nullptr;
-        ir->ty = make_ty(KOOPA_RTT_INT32);
-        ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-        ir->kind.tag = KOOPA_RVT_BINARY;
-        ir->kind.data.binary.op = KOOPA_RBO_AND;
-        ir->kind.data.binary.lhs = (koopa_raw_value_t)toBoolKoopaIR(land_exp, stmts);
-        ir->kind.data.binary.rhs = (koopa_raw_value_t)toBoolKoopaIR(eq_exp, stmts);
-        stmts.push_back(ir);
-        return ir;
-    }
-    else if(op == " ") {
-        return eq_exp->toKoopaIR(stmts);
-    }
-    return nullptr;
-}
-*/
 
 void *LAndExpAST::toKoopaIR() const {
-    //koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
     if(op == "&&") {
-        /*
-        ir->name = nullptr;
-        ir->ty = make_ty(KOOPA_RTT_INT32);
-        ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-        ir->kind.tag = KOOPA_RVT_BINARY;
-        ir->kind.data.binary.op = KOOPA_RBO_AND;
-        ir->kind.data.binary.lhs = (koopa_raw_value_t)toBoolKoopaIR(land_exp);
-        ir->kind.data.binary.rhs = (koopa_raw_value_t)toBoolKoopaIR(eq_exp);
-        block_manager.addInst(ir);
-        return ir;
-        */
         koopa_raw_value_data *temp_alloc = new koopa_raw_value_data;
         temp_alloc->name = add_prefix("@", "temp");
         temp_alloc->ty = make_pointer_ty(KOOPA_RTT_INT32);
@@ -1606,21 +1305,6 @@ int LAndExpAST::calculate() const {
     }
     return 0;
 }
-/*
-void *LAndExpAST::toBoolKoopaIR(const std::unique_ptr<BaseAST> &exp, std::vector<const void *> &stmts) const {
-    koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
-    ir->name = nullptr;
-    ir->ty = make_ty(KOOPA_RTT_INT32);
-    ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-    ir->kind.tag = KOOPA_RVT_BINARY;
-    ir->kind.data.binary.op = KOOPA_RBO_NOT_EQ;
-    NumberAST zero(0);
-    ir->kind.data.binary.lhs = (koopa_raw_value_t)zero.toKoopaIR();
-    ir->kind.data.binary.rhs = (koopa_raw_value_t)exp->toKoopaIR(stmts);
-    stmts.push_back(ir);
-    return ir;
-}
-*/
 
 void *LAndExpAST::toBoolKoopaIR(const std::unique_ptr<BaseAST> &exp) const {
     koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
@@ -1649,31 +1333,6 @@ void EqExpAST::Dump() const {
     }
     std::cout << " }";
 }
-/*
-void *EqExpAST::toKoopaIR(std::vector<const void *> &stmts) const {
-    koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
-    if(op != " ") {
-        ir->name = nullptr;
-        ir->ty = make_ty(KOOPA_RTT_INT32);
-        ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-        ir->kind.tag = KOOPA_RVT_BINARY;
-        if(op == "==") {
-            ir->kind.data.binary.op = KOOPA_RBO_EQ;
-        }
-        else if(op == "!=") {
-            ir->kind.data.binary.op = KOOPA_RBO_NOT_EQ;
-        }
-        ir->kind.data.binary.lhs = (koopa_raw_value_t)eq_exp->toKoopaIR(stmts);
-        ir->kind.data.binary.rhs = (koopa_raw_value_t)rel_exp->toKoopaIR(stmts);
-        stmts.push_back(ir);
-        return ir;
-    }
-    else if(op == " ") {
-        return rel_exp->toKoopaIR(stmts);
-    }
-    return nullptr;
-}
-*/
 
 void *EqExpAST::toKoopaIR() const {
     koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
@@ -1725,37 +1384,6 @@ void RelExpAST::Dump() const {
     }
     std::cout << " }";
 }
-/*
-void *RelExpAST::toKoopaIR(std::vector<const void *> &stmts) const {
-    koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
-    if(op != " ") {
-        ir->name = nullptr;
-        ir->ty = make_ty(KOOPA_RTT_INT32);
-        ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-        ir->kind.tag = KOOPA_RVT_BINARY;
-        if(op == "<") {
-            ir->kind.data.binary.op = KOOPA_RBO_LT;
-        }
-        else if(op == ">") {
-            ir->kind.data.binary.op = KOOPA_RBO_GT;
-        }
-        else if(op == "<=") {
-            ir->kind.data.binary.op = KOOPA_RBO_LE;
-        }
-        else if(op == ">=") {
-            ir->kind.data.binary.op = KOOPA_RBO_GE;
-        }
-        ir->kind.data.binary.lhs = (koopa_raw_value_t)rel_exp->toKoopaIR(stmts);
-        ir->kind.data.binary.rhs = (koopa_raw_value_t)add_exp->toKoopaIR(stmts);
-        stmts.push_back(ir);
-        return ir;
-    }
-    else if(op == " ") {
-        return add_exp->toKoopaIR(stmts);
-    }
-    return nullptr;
-}
-*/
 
 void *RelExpAST::toKoopaIR() const {
     koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
@@ -1819,31 +1447,6 @@ void AddExpAST::Dump() const {
     }
     std::cout << " }";
 }
-/*
-void *AddExpAST::toKoopaIR(std::vector<const void *> &stmts) const {
-    koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
-    if(op != " ") {
-        ir->name = nullptr;
-        ir->ty = make_ty(KOOPA_RTT_INT32);
-        ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-        ir->kind.tag = KOOPA_RVT_BINARY;
-        if(op == "+") {
-            ir->kind.data.binary.op = KOOPA_RBO_ADD;
-        }
-        else if(op == "-") {
-            ir->kind.data.binary.op = KOOPA_RBO_SUB;
-        }
-        ir->kind.data.binary.lhs = (koopa_raw_value_t)add_exp->toKoopaIR(stmts);
-        ir->kind.data.binary.rhs = (koopa_raw_value_t)mul_exp->toKoopaIR(stmts);
-        stmts.push_back(ir);
-        return ir;
-    }
-    else if(op == " ") {
-        return mul_exp->toKoopaIR(stmts);
-    }
-    return nullptr;
-}
-*/
 
 void *AddExpAST::toKoopaIR() const {
     koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
@@ -1895,34 +1498,7 @@ void MulExpAST::Dump() const {
     }
     std::cout << " }";
 }
-/*
-void *MulExpAST::toKoopaIR(std::vector<const void *> &stmts) const {
-    koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
-    if(op != " ") {
-        ir->name = nullptr;
-        ir->ty = make_ty(KOOPA_RTT_INT32);
-        ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-        ir->kind.tag = KOOPA_RVT_BINARY;
-        if(op == "*") {
-            ir->kind.data.binary.op = KOOPA_RBO_MUL;
-        }
-        else if(op == "/") {
-            ir->kind.data.binary.op = KOOPA_RBO_DIV;
-        }
-        else if(op == "%") {
-            ir->kind.data.binary.op = KOOPA_RBO_MOD;
-        }
-        ir->kind.data.binary.lhs = (koopa_raw_value_t)mul_exp->toKoopaIR(stmts);
-        ir->kind.data.binary.rhs = (koopa_raw_value_t)unary_exp->toKoopaIR(stmts);
-        stmts.push_back(ir);
-        return ir;
-    }
-    else if(op == " ") {
-        return unary_exp->toKoopaIR(stmts);
-    }
-    return nullptr;
-}
-*/
+
 
 void *MulExpAST::toKoopaIR() const {
     koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
@@ -1966,37 +1542,6 @@ int MulExpAST::calculate() const {
     }
     return 0;
 }
-/*
-void *UnaryExpAST::toKoopaIR(std::vector<const void *> &stmts) const {
-    koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
-    if(tag == "OPEXP") {
-        ir->name = nullptr;  
-        ir->ty = make_ty(KOOPA_RTT_INT32);
-        ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-        ir->kind.tag = KOOPA_RVT_BINARY;
-        if(unary_op == "-") {
-            ir->kind.data.binary.op = KOOPA_RBO_SUB;
-            NumberAST zero(0);
-            ir->kind.data.binary.lhs = (koopa_raw_value_t)zero.toKoopaIR();
-        }
-        else if(unary_op == "+") {
-            return unary_exp->toKoopaIR(stmts);
-        }
-        else if(unary_op == "!") {
-            ir->kind.data.binary.op = KOOPA_RBO_EQ;
-            NumberAST zero(0);
-            ir->kind.data.binary.lhs = (koopa_raw_value_t)zero.toKoopaIR();
-        }
-        ir->kind.data.binary.rhs = (koopa_raw_value_t)unary_exp->toKoopaIR(stmts);
-        stmts.push_back(ir);
-        return ir;
-    }
-    else if(tag == "PEXP") {
-        return primary_exp->toKoopaIR(stmts);
-    }
-    return nullptr;
-}
-*/
 
 void *UnaryExpAST::toKoopaIR() const {
     koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
@@ -2077,20 +1622,6 @@ void UnaryExpAST::Dump() const {
     }
     std::cout << " }";
 }
-/*
-void *PrimaryExpAST::toKoopaIR(std::vector<const void *> &stmts) const {
-    if(tag == "EXP") {
-        return exp->toKoopaIR(stmts);
-    }
-    else if(tag == "NUM") {
-        return number->toKoopaIR();
-    }
-    else if(tag == "LVAL") {
-        return lval->toKoopaIR(stmts);
-    }
-    return nullptr;
-}
-*/
 
 void *PrimaryExpAST::toKoopaIR() const {
     if(tag == "EXP") {
@@ -2132,27 +1663,6 @@ void PrimaryExpAST::Dump() const {
     std::cout << " }";
 }
 
-/*
-void *LValAST::toKoopaIR(std::vector<const void *> &stmts) const {
-    Value value = symbol_list.getSymbol(ident);
-    koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
-    ir->name = nullptr;
-    ir->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
-    ir->ty = make_ty(KOOPA_RTT_INT32);
-    if(value.type == ValueType::Var) {
-        ir->kind.tag = KOOPA_RVT_LOAD;
-        //ir->kind.data.integer.value = value.data.const_value;
-        ir->kind.data.load.src = (koopa_raw_value_t)value.data.var_value;
-        stmts.push_back(ir);
-    }
-    else if(value.type == ValueType::Const) {
-        ir->kind.tag = KOOPA_RVT_INTEGER;
-        ir->kind.data.integer.value = value.data.const_value;
-    }
-    return ir;
-}
-*/
-
 void *LValAST::toKoopaIR() const {
     Value value = symbol_list.getSymbol(ident);
     koopa_raw_value_data_t *ir = new koopa_raw_value_data_t;
@@ -2161,7 +1671,6 @@ void *LValAST::toKoopaIR() const {
     ir->ty = make_ty(KOOPA_RTT_INT32);
     if(value.type == ValueType::Var) {
         ir->kind.tag = KOOPA_RVT_LOAD;
-        //ir->kind.data.integer.value = value.data.const_value;
         ir->kind.data.load.src = (koopa_raw_value_t)value.data.var_value;
         block_manager.addInst(ir);
     }
