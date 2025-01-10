@@ -308,8 +308,10 @@ void Visit(const koopa_raw_branch_t &branch, std::ostream &cout) {
   else {
     load_from_stack("t0", get_addr(branch.cond), cout);
   }
-  cout<<"\tbnez  t0, "<<remove_prefix("%", branch.true_bb->name)<<"\n";
+  cout<<"\tbnez  t0, "<<remove_prefix("%", branch.true_bb->name)<<"_tmp\n";
   cout<<"\tj     "<<remove_prefix("%", branch.false_bb->name)<<"\n";
+  cout<<remove_prefix("%", branch.true_bb->name)<<"_tmp:\n";
+  cout<<"\tj     "<<remove_prefix("%", branch.true_bb->name)<<"\n";
 }
 
 // 访问返回指令
