@@ -7,10 +7,8 @@ bool func_call = false;
 std::map<koopa_raw_value_t, int> addr_map;
 
 void Visit(const koopa_raw_program_t &program, std::ostream &cout) {
-  std::cout<<"visiting value\n";
   cout<<"\t.data\n";
   Visit(program.values, cout);
-  std::cout<<"visiting function\n";
   Visit(program.funcs, cout);
 }
 
@@ -137,7 +135,6 @@ void Visit(const koopa_raw_value_t &value, std::ostream &cout) {
       break;
     default:
       // 其他类型暂时遇不到
-      std::cout<<kind.tag<<"\n";
       assert(false);
   }
 }
@@ -494,12 +491,10 @@ int func_size(const koopa_raw_function_t &func, bool &call) {
 }
 
 int bb_size(const koopa_raw_basic_block_t &bb, bool &call, int &arg_count) {
-  //std::cout<<bb->name<<"\n";
   int size = 0;
   for (size_t i = 0; i < bb->insts.len; ++i) {
     auto ptr = bb->insts.buffer[i];
     size += inst_size(reinterpret_cast<koopa_raw_value_t>(ptr), call, arg_count);
-    //std::cout<<size<<"\n";
   }
   return size;
 }
