@@ -859,6 +859,7 @@ void *VarDefAST::toKoopaIR(koopa_raw_type_t type) const {
         }
         else
         {
+            /*
             koopa_raw_value_data *store = new koopa_raw_value_data();
             store->name = nullptr;
             store->used_by = make_slice(nullptr, KOOPA_RSIK_VALUE);
@@ -872,6 +873,7 @@ void *VarDefAST::toKoopaIR(koopa_raw_type_t type) const {
             zero->kind.tag = KOOPA_RVT_ZERO_INIT;
             store->kind.data.store.value = (koopa_raw_value_t)zero;
             block_manager.addInst(store);
+            */
         }
         return nullptr;
     }
@@ -937,7 +939,6 @@ void *VarDefAST::toKoopaIR(koopa_raw_type_t type, std::vector<const void *> &val
             {
                 std::vector<const void *> init_val_vec;
                 init_val->restructure(dim_size, init_val_vec);
-                std::cout<<std::endl<<total_size<<' '<<init_val_vec.size()<<std::endl;
                 assert(total_size == init_val_vec.size());
                 ir->kind.data.global_alloc.init = (koopa_raw_value_t)init_val->toKoopaIR(init_val_vec, dim_size);
             }

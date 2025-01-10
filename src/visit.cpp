@@ -129,6 +129,12 @@ void Visit(const koopa_raw_value_t &value, std::ostream &cout) {
     case KOOPA_RVT_GLOBAL_ALLOC:
       global_var(value, cout);
       break;
+    case KOOPA_RVT_GET_ELEM_PTR:
+      Visit(kind.data.get_elem_ptr, dest_addr, cout);
+      break;
+    case KOOPA_RVT_GET_PTR:
+      Visit(kind.data.get_ptr, dest_addr, cout);
+      break;
     default:
       // 其他类型暂时遇不到
       std::cout<<kind.tag<<"\n";
@@ -146,6 +152,94 @@ void global_var(const koopa_raw_value_t &value, std::ostream &cout) {
   {
     cout<<"\t.zero "<<type_size(value->ty->data.pointer.base)<<"\n";
   }
+  else if(value->kind.data.global_alloc.init->kind.tag == KOOPA_RVT_AGGREGATE)
+  {
+    Visit(value->kind.data.global_alloc.init->kind.data.aggregate, cout);
+  }
+}
+
+//aggregate指令
+void Visit(const koopa_raw_aggregate_t &aggregate, std::ostream &cout) {
+  for (size_t i = 0; i < aggregate.elems.len; ++i) {
+    auto ptr = reinterpret_cast<koopa_raw_value_t>(aggregate.elems.buffer[i]);
+    if(ptr->kind.tag == KOOPA_RVT_INTEGER) {
+      cout<<"\t.word "<<ptr->kind.data.integer.value<<"\n";
+    }
+    else if(ptr->kind.tag == KOOPA_RVT_AGGREGATE)
+    {
+      Visit(ptr->kind.data.aggregate, cout);
+    }
+    else
+    {
+      assert(false);
+    }
+  }
+}
+
+// get element pointer
+void Visit(const koopa_raw_get_elem_ptr_t &get_elem_ptr, int dest_addr, std::ostream &cout) {
+  // 访问 get element pointer 指令
+  if(get_elem_ptr.src->kind.tag == KOOPA_RVT_GLOBAL_ALLOC) {
+    cout<<"\tla    t0, "<<remove_prefix("@", get_elem_ptr.src->name)<<"\n";
+  }
+  else {
+    int src_addr = get_addr(get_elem_ptr.src);
+    assert(src_addr != -1);
+    if(src_addr >= -2048 && src_addr < 2048)
+      cout<<"\taddi  t0, sp, "<<src_addr<<"\n";
+    else
+    {
+      cout<<"\tli    t1, "<<src_addr<<"\n";
+      cout<<"\tadd   t0, sp, t1\n";
+    }
+
+    if (get_elem_ptr.src->kind.tag == KOOPA_RVT_GET_ELEM_PTR || get_elem_ptr.src->kind.tag == KOOPA_RVT_GET_PTR)
+      cout<<"\tlw    t0, 0(t0)\n";
+    
+  }
+
+  if(get_elem_ptr.index->kind.tag == KOOPA_RVT_INTEGER) {
+    cout<<"\tli    t1, "<<get_elem_ptr.index->kind.data.integer.value<<"\n";
+  }
+  else {
+    load_from_stack("t1", get_addr(get_elem_ptr.index), cout);
+  }
+  int size = array_size(get_elem_ptr.src->ty->data.pointer.base->data.array.base);
+  cout<<"\tli    t2, "<<size<<"\n";
+  cout<<"\tmul   t1, t1, t2\n";
+  cout<<"\tadd   t0, t0, t1\n";
+  store_to_stack("t0", dest_addr, cout);
+
+}
+
+// get pointer
+void Visit(const koopa_raw_get_ptr_t &get_ptr, int dest_addr, std::ostream &cout) {
+  // 访问 get pointer 指令
+  int src_addr = get_addr(get_ptr.src);
+  assert(src_addr != -1);
+  if(src_addr >= -2048 && src_addr < 2048)
+    cout<<"\taddi  t0, sp, "<<src_addr<<"\n";
+  else
+  {
+    cout<<"\tli    t1, "<<src_addr<<"\n";
+    cout<<"\tadd   t0, sp, t1\n";
+  }
+
+  cout<<"\tlw    t0, 0(t0)\n";
+
+  if(get_ptr.index->kind.tag == KOOPA_RVT_INTEGER) {
+    cout<<"\tli    t1, "<<get_ptr.index->kind.data.integer.value<<"\n";
+  }
+  else {
+    load_from_stack("t1", get_addr(get_ptr.index), cout);
+  }
+
+  int size = array_size(get_ptr.src->ty->data.pointer.base);
+  cout<<"\tli    t2, "<<size<<"\n";
+  cout<<"\tmul   t1, t1, t2\n";
+  cout<<"\tadd   t0, t0, t1\n";
+  store_to_stack("t0", dest_addr, cout);
+
 }
 
 // 访问函数调用指令
@@ -246,9 +340,14 @@ void Visit(const koopa_raw_store_t &store, std::ostream &cout) {
     else {
       load_from_stack("t0", get_addr(store.value), cout);
     }
+
     //加载dest
     if(store.dest->kind.tag == KOOPA_RVT_GLOBAL_ALLOC) {
       cout<<"\tla    t1, "<<remove_prefix("@", store.dest->name)<<"\n";
+      cout<<"\tsw    t0, 0(t1)\n";
+    }
+    else if(store.dest->kind.tag == KOOPA_RVT_GET_ELEM_PTR || store.dest->kind.tag == KOOPA_RVT_GET_PTR) {
+      load_from_stack("t1", get_addr(store.dest), cout);
       cout<<"\tsw    t0, 0(t1)\n";
     }
     else
@@ -261,6 +360,10 @@ void Visit(const koopa_raw_load_t &load, int dest_addr, std::ostream &cout) {
   // 访问加载指令
   if(load.src->kind.tag == KOOPA_RVT_GLOBAL_ALLOC) {
     cout<<"\tla    t0, "<<remove_prefix("@", load.src->name)<<"\n";
+    cout<<"\tlw    t0, 0(t0)\n";
+  }
+  else if(load.src->kind.tag == KOOPA_RVT_GET_ELEM_PTR || load.src->kind.tag == KOOPA_RVT_GET_PTR) {
+    load_from_stack("t0", get_addr(load.src), cout);
     cout<<"\tlw    t0, 0(t0)\n";
   }
   else
@@ -368,10 +471,12 @@ int func_size(const koopa_raw_function_t &func, bool &call) {
 }
 
 int bb_size(const koopa_raw_basic_block_t &bb, bool &call, int &arg_count) {
+  //std::cout<<bb->name<<"\n";
   int size = 0;
   for (size_t i = 0; i < bb->insts.len; ++i) {
     auto ptr = bb->insts.buffer[i];
     size += inst_size(reinterpret_cast<koopa_raw_value_t>(ptr), call, arg_count);
+    //std::cout<<size<<"\n";
   }
   return size;
 }
@@ -394,15 +499,34 @@ int type_size(const koopa_raw_type_t &ty) {
       return 4;
     case KOOPA_RTT_UNIT:
       return 0;
+    case KOOPA_RTT_POINTER:
+      return 4;
+    case KOOPA_RTT_ARRAY:
+      return array_size(ty);
     default:
       assert(false);
   }
 }
 
+int array_size(const koopa_raw_type_t &ty) {
+  int size = 4;
+  auto ptr = ty;
+  while(ptr->tag == KOOPA_RTT_ARRAY) {
+    size *= ptr->data.array.len;
+    ptr = ptr->data.array.base;
+  }
+  return size;
+}
+
 int get_addr(const koopa_raw_value_t &value) {
   if (addr_map.find(value) == addr_map.end()) {
+    int t;
+    if(value->kind.tag == KOOPA_RVT_ALLOC)
+      t = type_size(value->ty->data.pointer.base);
+    else
+      t = type_size(value->ty);
     addr_map[value] = cur_size;
-    cur_size += 4;
+    cur_size += t;
   }
   return addr_map[value];
 }
