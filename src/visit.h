@@ -25,6 +25,8 @@ void Visit(const koopa_raw_get_ptr_t &get_ptr, int dest_addr, std::ostream &cout
 void Visit(const koopa_raw_get_elem_ptr_t &get_elem_ptr, int dest_addr, std::ostream &cout);
 void Visit(const koopa_raw_aggregate_t &aggregate, std::ostream &cout);
 
+void aggregate_init(const koopa_raw_value_t &value, std::ostream &cout);
+
 void global_var(const koopa_raw_value_t &value, std::ostream &cout);
 
 void load(const koopa_raw_value_t &value, std::string r, std::ostream &cout);

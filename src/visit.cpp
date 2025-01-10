@@ -154,7 +154,8 @@ void global_var(const koopa_raw_value_t &value, std::ostream &cout) {
   }
   else if(value->kind.data.global_alloc.init->kind.tag == KOOPA_RVT_AGGREGATE)
   {
-    Visit(value->kind.data.global_alloc.init->kind.data.aggregate, cout);
+    //Visit(value->kind.data.global_alloc.init->kind.data.aggregate, cout);
+    aggregate_init(value->kind.data.global_alloc.init, cout);
   }
 }
 
@@ -174,6 +175,22 @@ void Visit(const koopa_raw_aggregate_t &aggregate, std::ostream &cout) {
       assert(false);
     }
   }
+}
+
+void aggregate_init(const koopa_raw_value_t &value, std::ostream &cout)
+{
+    if (value->kind.tag == KOOPA_RVT_INTEGER)
+    {
+        cout<<"  .word " + std::to_string(value->kind.data.integer.value) + "\n";
+    }
+    else if (value->kind.tag == KOOPA_RVT_AGGREGATE)
+    {
+        const auto &agg = value->kind.data.aggregate;
+        for (int i = 0; i < agg.elems.len; i++)
+        {
+          aggregate_init(reinterpret_cast<koopa_raw_value_t>(agg.elems.buffer[i]), cout);
+        }
+    }
 }
 
 // get element pointer
