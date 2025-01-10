@@ -154,8 +154,8 @@ void global_var(const koopa_raw_value_t &value, std::ostream &cout) {
   }
   else if(value->kind.data.global_alloc.init->kind.tag == KOOPA_RVT_AGGREGATE)
   {
-    //Visit(value->kind.data.global_alloc.init->kind.data.aggregate, cout);
-    aggregate_init(value->kind.data.global_alloc.init, cout);
+    Visit(value->kind.data.global_alloc.init->kind.data.aggregate, cout);
+    //aggregate_init(value->kind.data.global_alloc.init, cout);
   }
 }
 
@@ -353,6 +353,10 @@ void Visit(const koopa_raw_store_t &store, std::ostream &cout) {
     //加载source
     if(store.value->kind.tag == KOOPA_RVT_INTEGER) {
       cout<<"\tli    t0"<<", "<<store.value->kind.data.integer.value<<"\n";
+    }
+    else if(store.value->kind.tag == KOOPA_RVT_ZERO_INIT)
+    {
+      return;
     }
     else {
       load_from_stack("t0", get_addr(store.value), cout);

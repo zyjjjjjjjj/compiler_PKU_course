@@ -55,7 +55,8 @@ int main(int argc, const char *argv[]) {
     koopa_dump_to_file(inter_program, output);
     koopa_delete_program(inter_program);
   }
-  else if(std::string(mode) == "-riscv") {
+  else if(std::string(mode) == "-riscv" || std::string(mode) == "-perf") 
+  {
     size_t len = 1000000u;
     char *buf = new char[len];
     std::cout<<"dumping to string...\n";
